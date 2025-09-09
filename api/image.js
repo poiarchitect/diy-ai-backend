@@ -1,13 +1,16 @@
+const ALLOWED_SIZES = new Set(["1024x1024", "1024x1536", "1536x1024", 
+"auto"]);
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Safely read JSON body even if the runtime doesn't auto-parse
-  let prompt = "";
+  // Parse JSON body robustly
+  let body = {};
   try {
     if (req.body && typeof req.body === "object") {
-      prompt = req.body.prompt || "";
+      body = req.body;
     } else {
       const raw = await new Promise((resolve, reject) => {
         let data = "";
@@ -15,19 +18,23 @@ export default async function handler(req, res) {
         req.on("end", () => resolve(data));
         req.on("error", reject);
       });
-      const parsed = raw ? JSON.parse(raw) : {};
-      prompt = parsed.prompt || "";
+      body = raw ? JSON.parse(raw) : {};
     }
-  } catch (e) {
+  } catch {
     return res.status(400).json({ error: "Invalid JSON body" });
   }
+
+  const prompt = (body.prompt || "").trim();
+  let size = (body.size || "1024x1024").trim();
+  if (!ALLOWED_SIZES.has(size)) size = "1024x1024";
 
   if (!prompt) {
     return res.status(400).json({ error: "Missing 'prompt' in body" });
   }
 
   try {
-    const r = await fetch("https://api.openai.com/v1/images/generations", {
+    const r = await fetch("https://api.openai.com/v1/images/generations", 
+{
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -36,14 +43,14 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-image-1",
         prompt,
-        size: "512x512",
+        size,
       }),
     });
 
-    // If OpenAI returns an error, forward the text so we can see it
     if (!r.ok) {
       const text = await r.text().catch(() => "(no body)");
-      return res.status(r.status).json({ error: "OpenAI error", status: r.status, body: text });
+      return res.status(r.status).json({ error: "OpenAI error", status: 
+r.status, body: text });
     }
 
     const data = await r.json();
