@@ -4,7 +4,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt, size } = req.body || {};
+    // Parse JSON body safely
+    const { prompt, size } = await req.json().catch(() => ({}));
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({ error: "Missing 'prompt' string in request" });
     }
