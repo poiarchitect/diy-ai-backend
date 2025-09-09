@@ -12,10 +12,12 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     if (!prompt) {
-      return res.status(400).json({ error: "Missing 'prompt' in request" });
+      return res.status(400).json({ error: "Missing 'prompt' in request" 
+});
     }
 
-    const r = await fetch("https://api.openai.com/v1/images/generations", {
+    const r = await fetch("https://api.openai.com/v1/images/generations", 
+{
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -26,8 +28,7 @@ export default async function handler(req, res) {
         prompt,
         size,
         quality,
-        background,
-        response_format: "url"
+        background
       })
     });
 
@@ -48,8 +49,8 @@ export default async function handler(req, res) {
       usage: data?.usage || null
     });
   } catch (err) {
-    console.error("Image API error:", err);
-    return res.status(500).json({ error: "Something went wrong in /api/image" });
+    return res.status(500).json({ error: "Something went wrong in 
+/api/image" });
   }
 }
 
