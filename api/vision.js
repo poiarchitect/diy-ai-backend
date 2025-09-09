@@ -1,60 +1,52 @@
-// api/vision.js
-export const config = { api: { bodyParser: false } };
-
-import busboy from "busboy";
-
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "POST 
-only" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-  const bb = busboy({ headers: req.headers });
+  try {
+    const { image_url, image_b64, question = "Please analyze this image." 
+} = req.body || {};
+    if (!image_url && !image_b64) {
+      return res.status(400).json({ error: "Provide 'image_url' or 
+'image_b64'" });
+    }
+    const url = image_url || `data:image/png;base64,${image_b64}`;
 
-  let question = "Describe the image for DIY context.";
-  let fileChunks = [];
-  let fileMime = "image/jpeg";
-
-  await new Promise((resolve, reject) => {
-    bb.on("file", (name, file, info) => {
-      fileMime = info.mimeType || "image/jpeg";
-      file.on("data", d => fileChunks.push(d));
-    });
-    bb.on("field", (name, val) => {
-      if (name === "question") question = val.trim();
-    });
-    bb.on("close", resolve);
-    bb.on("error", reject);
-    req.pipe(bb);
-  });
-
-  const buffer = Buffer.concat(fileChunks);
-  const b64 = buffer.toString("base64");
-
-  const body = {
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: "You are a safety-first DIY coach." },
-      {
-        role: "user",
-        content: [
-          { type: "text", text: question },
-          { type: "input_image", image_data: { b64, mime_type: fileMime } 
-}
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are the DIY AI Assistant. Stay within DIY scope. Do NOT 
+provide instructions for electrical, gas, or plumbing work. Emphasize 
+safety and advise licensed professionals when risk or regulations apply."
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: question },
+              { type: "image_url", image_url: { url } }
+            ]
+          }
         ]
-      }
-    ],
-    max_tokens: 400
-  };
+      })
+    });
 
-  const r = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: data });
 
-  const json = await r.json();
-  return res.status(r.ok ? 200 : 400).json(json);
+    const reply = data?.choices?.[0]?.message?.content || "";
+    return res.status(200).json({ reply });
+  } catch {
+    return res.status(500).json({ error: "Something went wrong in 
+/api/vision" });
+  }
 }
 

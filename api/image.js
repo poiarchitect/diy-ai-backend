@@ -1,63 +1,48 @@
-const ALLOWED_SIZES = new Set(["1024x1024", "1024x1536", "1536x1024", 
-"auto"]);
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Parse JSON body robustly
-  let body = {};
   try {
-    if (req.body && typeof req.body === "object") {
-      body = req.body;
-    } else {
-      const raw = await new Promise((resolve, reject) => {
-        let data = "";
-        req.on("data", (c) => (data += c));
-        req.on("end", () => resolve(data));
-        req.on("error", reject);
-      });
-      body = raw ? JSON.parse(raw) : {};
+    const {
+      prompt,
+      size = "1024x1024",      // allowed: 256x256, 512x512, 1024x1024, 1024x1536, 1536x1024, or "auto"
+      quality = "high",         // "high" or "standard"
+      background = "white"      // "white" or "transparent"
+    } = req.body || {};
+
+    if (!prompt) {
+      return res.status(400).json({ error: "Missing 'prompt' in request" });
     }
-  } catch {
-    return res.status(400).json({ error: "Invalid JSON body" });
-  }
 
-  const prompt = (body.prompt || "").trim();
-  let size = (body.size || "1024x1024").trim();
-  if (!ALLOWED_SIZES.has(size)) size = "1024x1024";
-
-  if (!prompt) {
-    return res.status(400).json({ error: "Missing 'prompt' in body" });
-  }
-
-  try {
-    const r = await fetch("https://api.openai.com/v1/images/generations", 
-{
+    const r = await fetch("https://api.openai.com/v1/images", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
         model: "gpt-image-1",
         prompt,
         size,
-      }),
+        quality,
+        background
+      })
     });
 
-    if (!r.ok) {
-      const text = await r.text().catch(() => "(no body)");
-      return res.status(r.status).json({ error: "OpenAI error", status: 
-r.status, body: text });
-    }
-
     const data = await r.json();
-    return res.status(200).json(data);
-  } catch (err) {
-    console.error("Image API error:", err);
-    return res.status(500).json({ error: "Server error in /api/image" });
+    if (!r.ok) return res.status(r.status).json({ error: data });
+
+    const b64 = data?.data?.[0]?.b64_json || null;
+    const output_url = data?.data?.[0]?.url || null; // sometimes null for gpt-image-1
+    const data_url = b64 ? `data:image/png;base64,${b64}` : null;
+
+    return res.status(200).json({
+      image: { data_url, b64, output_url },
+      usage: data?.usage || null
+    });
+  } catch {
+    return res.status(500).json({ error: "Something went wrong in /api/image" });
   }
 }
 
