@@ -4,36 +4,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt, size } = req.body;
+    const { prompt } = req.body;
 
-    if (!prompt || typeof prompt !== "string") {
-      return res.status(400).json({ error: "Missing 'prompt' string in request" });
+    // Quick validation
+    if (!prompt) {
+      return res.status(400).json({ error: "Missing prompt" });
     }
 
-    const response = await fetch("https://api.openai.com/v1/images/generations", {
+    // Call OpenAI Images API
+    const response = await 
+fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
         model: "gpt-image-1",
         prompt,
-        n: 1,
-        size: size || "1024x1024",
+        size: "512x512"
       }),
     });
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data });
-    }
+    // Pass raw response back
+    return res.status(200).json(data);
 
-    return res.status(200).json({ image_url: data.data[0].url });
   } catch (err) {
     console.error("Image API error:", err);
-    return res.status(500).json({ error: "Something went wrong in /api/image" });
+    return res.status(500).json({ error: "Something went wrong in 
+/api/image" });
   }
 }
 
