@@ -6,9 +6,9 @@ export default async function handler(req, res) {
   try {
     const {
       prompt,
-      size = "1024x1024",      // allowed: 256x256, 512x512, 1024x1024, 1024x1536, 1536x1024, or "auto"
-      quality = "high",         // "high" or "standard"
-      background = "white"      // "white" or "transparent"
+      size = "1024x1024",
+      quality = "high",
+      background = "white"
     } = req.body || {};
 
     if (!prompt) {
@@ -26,22 +26,21 @@ export default async function handler(req, res) {
         prompt,
         size,
         quality,
-        background
+        background,
+        response_format: "url"
       })
     });
 
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: data });
 
-    const b64 = data?.data?.[0]?.b64_json || null;
-    const output_url = data?.data?.[0]?.url || null; // sometimes null for gpt-image-1
-    const data_url = b64 ? `data:image/png;base64,${b64}` : null;
+    const image_url = data?.data?.[0]?.url || null;
 
     return res.status(200).json({
-      image: { data_url, b64, output_url },
+      image_url,
       usage: data?.usage || null
     });
-  } catch {
+  } catch (err) {
     return res.status(500).json({ error: "Something went wrong in /api/image" });
   }
 }
