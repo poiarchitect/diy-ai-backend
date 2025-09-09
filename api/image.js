@@ -4,8 +4,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Parse JSON body safely
-    const { prompt, size } = await req.json().catch(() => ({}));
+    const { prompt, size } = req.body;
+
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({ error: "Missing 'prompt' string in request" });
     }
@@ -24,12 +24,12 @@ export default async function handler(req, res) {
       }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errTxt = await response.text();
-      return res.status(response.status).json({ error: errTxt });
+      return res.status(response.status).json({ error: data });
     }
 
-    const data = await response.json();
     return res.status(200).json({ image_url: data.data[0].url });
   } catch (err) {
     console.error("Image API error:", err);
