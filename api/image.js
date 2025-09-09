@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt } = req.body || {};
+    const { prompt, size = "1024x1024" } = req.body || {};
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
     const r = await fetch("https://api.openai.com/v1/images/generations", {
@@ -16,18 +16,23 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-image-1",
         prompt,
-        size: "1024x1024"
+        size
       })
     });
 
     const data = await r.json();
     if (!r.ok) return res.status(r.status).json({ error: data });
 
-    return res.status(200).json({
-      image_url: data?.data?.[0]?.url || null
-    });
+    const url = data?.data?.[0]?.url || null;
+    const b64 = data?.data?.[0]?.b64_json || null;
+    const data_url = b64 ? `data:image/png;base64,${b64}` : null;
+
+    if (!url && !data_url) {
+      return res.status(502).json({ error: "No image returned" });
+    }
+
+    return res.status(200).json({ image_url: url, data_url, usage: data?.usage || null });
   } catch (err) {
-    console.error("Image API error:", err);
     return res.status(500).json({ error: "Something went wrong in /api/image" });
   }
 }
