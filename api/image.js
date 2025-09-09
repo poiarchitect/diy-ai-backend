@@ -6,10 +6,9 @@ export default async function handler(req, res) {
   try {
     const {
       prompt,
-      size = "1024x1024",   // valid: 256x256, 512x512, 1024x1024, 
-1024x1536, 1536x1024, auto
-      quality = "high",     // "high" or "standard"
-      background = "white"  // "white" or "transparent"
+      size = "1024x1024",
+      quality = "high",
+      background = "white"
     } = req.body || {};
 
     if (!prompt) {
@@ -36,7 +35,6 @@ export default async function handler(req, res) {
     const data = await r.json();
 
     if (!r.ok) {
-      console.error("OpenAI error:", data);
       return res.status(r.status).json({ error: data });
     }
 
@@ -44,17 +42,12 @@ export default async function handler(req, res) {
     const b64 = data?.data?.[0]?.b64_json || null;
     const data_url = b64 ? `data:image/png;base64,${b64}` : null;
 
-    if (!image_url && !data_url) {
-      return res.status(502).json({ error: "No image returned" });
-    }
-
     return res.status(200).json({
       image_url,
       fallback_data_url: data_url,
       usage: data?.usage || null
     });
   } catch (err) {
-    console.error("Image API error:", err);
     return res.status(500).json({ error: "Something went wrong in 
 /api/image" });
   }
