@@ -9,8 +9,11 @@ export default async function handler(req, res) {
     const { prompt, image_url } = req.body;
 
     if (!prompt || !image_url) {
-      return res.status(400).json({ error: "Missing prompt or image_url" });
+      return res.status(400).json({ error: "Missing prompt or image_url" 
+});
     }
+
+    console.log("🟢 Vision request received:", { prompt, image_url });
 
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -25,13 +28,17 @@ export default async function handler(req, res) {
       ],
     });
 
+    console.log("🟢 OpenAI response:", JSON.stringify(response, null, 2));
+
     res.status(200).json({
       description: response.choices[0].message.content,
     });
   } catch (error) {
-    console.error("Vision API error:", error);
-    res.status(500).json({ error: error.message });
+    console.error("🔴 Vision API error:", error);
+    res.status(500).json({
+      error: error.message,
+      details: error.response ? error.response.data : null,
+    });
   }
 }
-
 
