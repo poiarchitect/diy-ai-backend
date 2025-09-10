@@ -12,9 +12,7 @@ export default async function handler(req, res) {
       size: size || "1024x1024",
     });
 
-    // extract only the URL
-    const imageUrl = response.data && response.data[0] && 
-response.data[0].url;
+    const imageUrl = response.data?.[0]?.url;
 
     if (!imageUrl) {
       return res.status(500).json({
@@ -32,8 +30,9 @@ response.data[0].url;
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: error.message || "Unknown error",
+      error: error.message || JSON.stringify(error),
     });
   }
 }
+
 
