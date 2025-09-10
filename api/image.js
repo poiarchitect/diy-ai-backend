@@ -4,7 +4,7 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   try {
-    const { prompt, size } = JSON.parse(req.body);
+    const { prompt, size } = req.body; // no JSON.parse
 
     const response = await client.images.generate({
       model: "gpt-image-1",
@@ -12,8 +12,7 @@ export default async function handler(req, res) {
       size: size || "1024x1024",
     });
 
-    const imageUrl = response.data && response.data[0] && 
-response.data[0].url;
+    const imageUrl = response.data?.[0]?.url;
 
     if (!imageUrl) {
       return res.status(500).json({
@@ -28,11 +27,12 @@ response.data[0].url;
       size: size || "1024x1024",
       url: imageUrl,
     });
-  } catch (error) {
+  } catch (err) {
     res.status(500).json({
       success: false,
-      error: error.message || "Unknown error",
+      error: err.message || "Unknown error",
     });
   }
 }
+
 
