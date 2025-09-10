@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   } catch (err) {
     res.status(500).json({
       success: false,
-      error: err.message || "Unknown error",
+      error: String(err.message || err),
     });
   }
 }
