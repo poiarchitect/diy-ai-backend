@@ -9,12 +9,11 @@ export default async function handler(req, res) {
     const { prompt, image_url } = req.body;
 
     if (!prompt || !image_url) {
-      return res.status(400).json({ error: "Missing prompt or image_url" 
-});
+      return res.status(400).json({ error: "Missing prompt or image_url" });
     }
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini", // supports text + images
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
@@ -27,7 +26,7 @@ export default async function handler(req, res) {
     });
 
     res.status(200).json({
-      reply: completion.choices[0].message.content,
+      description: response.choices[0].message.content,
     });
   } catch (error) {
     console.error("Vision API error:", error);
