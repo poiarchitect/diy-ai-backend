@@ -21,16 +21,16 @@ export default async function handler(req, res) {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       url: imageUrl,
       prompt,
       size: size || "1024x1024",
     });
   } catch (err) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: String(err.message || err),
+      error: err?.message ? String(err.message) : "Unknown error",
     });
   }
 }
