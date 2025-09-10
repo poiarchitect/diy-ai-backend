@@ -4,7 +4,7 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   try {
-    const { prompt, size } = req.body; // no JSON.parse
+    const { prompt, size } = req.body;
 
     const response = await client.images.generate({
       model: "gpt-image-1",
@@ -12,12 +12,15 @@ export default async function handler(req, res) {
       size: size || "1024x1024",
     });
 
+    console.log("RAW RESPONSE:", JSON.stringify(response, null, 2));
+
     const imageUrl = response.data?.[0]?.url;
 
     if (!imageUrl) {
       return res.status(500).json({
         success: false,
         error: "No image URL returned from OpenAI",
+        raw: response, // send raw response back for debugging
       });
     }
 
