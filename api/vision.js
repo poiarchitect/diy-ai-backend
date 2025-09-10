@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     }
 
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini", // vision-capable model
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
@@ -30,7 +30,9 @@ export default async function handler(req, res) {
       ],
     });
 
-    res.status(200).json({ output: response.choices[0].message.content });
+    res.status(200).json({
+      output: response.choices[0].message.content,
+    });
   } catch (error) {
     console.error("Vision API error:", error);
     res.status(500).json({ error: error.message });
