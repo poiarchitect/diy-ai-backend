@@ -9,13 +9,10 @@ export default async function handler(req, res) {
     const result = await client.images.generate({
       model: "gpt-image-1",
       prompt,
-      size: size || "1024x1024", // default fallback
+      size: size || "1024x1024", // fallback to 1024x1024
     });
 
-    // log for safety
-    console.log("Image result:", result);
-
-    // return only the first image URL
+    // Return the first image URL clearly
     res.status(200).json({ url: result.data[0].url });
   } catch (error) {
     console.error("Image generation error:", error);
