@@ -4,25 +4,26 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   try {
-    const { prompt, size } = req.body;
+    const { prompt, size } = JSON.parse(req.body);
 
     const response = await client.images.generate({
       model: "gpt-image-1",
       prompt,
       size: size || "1024x1024",
+      response_format: "b64_json",  // ask OpenAI for base64
     });
 
-    console.log("RAW RESPONSE:", JSON.stringify(response, null, 2));
+    const imageBase64 = response.data[0].b64_json;
 
-    const imageUrl = response.data?.[0]?.url;
-
-    if (!imageUrl) {
+    if (!imageBase64) {
       return res.status(500).json({
         success: false,
-        error: "No image URL returned from OpenAI",
-        raw: response, // send raw response back for debugging
+        error: "No image data returned from OpenAI",
       });
     }
+
+    // Convert base64 → data URL so Bubble can use it
+    const imageUrl = `data:image/png;base64,${imageBase64}`;
 
     res.status(200).json({
       success: true,
@@ -30,12 +31,11 @@ export default async function handler(req, res) {
       size: size || "1024x1024",
       url: imageUrl,
     });
-  } catch (err) {
+  } catch (error) {
     res.status(500).json({
       success: false,
-      error: err.message || "Unknown error",
+      error: error.message || "Unknown error",
     });
   }
 }
-
 
