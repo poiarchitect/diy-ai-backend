@@ -1,19 +1,20 @@
-import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(req) {
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const body = await req.json();
     const { prompt, size = "1024x1024", quality = "high", background = 
-"white" } = body;
+"white" } = req.body;
 
     if (!prompt) {
-      return NextResponse.json({ error: "Missing prompt" }, { status: 400 
-});
+      return res.status(400).json({ error: "Missing prompt" });
     }
 
     const response = await client.images.generate({
@@ -25,13 +26,11 @@ export async function POST(req) {
     });
 
     const imageUrl = response.data[0].url;
-    return NextResponse.json({ image_url: imageUrl, raw: response });
+    res.status(200).json({ image_url: imageUrl, raw: response });
   } catch (error) {
-    console.error("Error generating image:", error);
-    return NextResponse.json(
-      { error: error.message || "Image generation failed" },
-      { status: 500 }
-    );
+    console.error("Image generation failed:", error);
+    res.status(500).json({ error: error.message || "Image generation 
+failed" });
   }
 }
 
