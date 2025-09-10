@@ -28,9 +28,10 @@ export default async function handler(req, res) {
       size: size || "1024x1024",
     });
   } catch (err) {
+    console.error("IMAGE API ERROR:", err);
     return res.status(500).json({
       success: false,
-      error: err?.message ? String(err.message) : "Unknown error",
+      error: JSON.stringify(err, Object.getOwnPropertyNames(err)),
     });
   }
 }
