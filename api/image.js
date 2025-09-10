@@ -12,7 +12,8 @@ export default async function handler(req, res) {
       size: size || "1024x1024",
     });
 
-    const imageUrl = response.data?.[0]?.url;
+    const imageUrl = response.data && response.data[0] && 
+response.data[0].url;
 
     if (!imageUrl) {
       return res.status(500).json({
@@ -21,19 +22,17 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      url: imageUrl,
       prompt,
       size: size || "1024x1024",
+      url: imageUrl,
     });
-  } catch (err) {
-    console.error("IMAGE API ERROR:", err);
-    return res.status(500).json({
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      error: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+      error: error.message || "Unknown error",
     });
   }
 }
-
 
