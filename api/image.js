@@ -6,7 +6,13 @@ const client = new OpenAI({
 
 export default async function handler(req, res) {
   try {
-    const { prompt, size } = req.body;
+    // Ensure request body is parsed
+    let body = req.body;
+    if (typeof body === "string") {
+      body = JSON.parse(body);
+    }
+
+    const { prompt, size } = body;
 
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required" });
@@ -14,7 +20,7 @@ export default async function handler(req, res) {
 
     const response = await client.images.generate({
       model: "gpt-image-1",
-      prompt: prompt,
+      prompt,
       size: size || "512x512",
     });
 
@@ -22,8 +28,9 @@ export default async function handler(req, res) {
       url: response.data[0].url,
     });
   } catch (error) {
-    console.error("Image generation failed:", error);
-    return res.status(500).json({ error: error.message });
+    console.error("Image endpoint error:", error);
+    return res.status(500).json({ error: error.message || "Unknown error" 
+});
   }
 }
 
