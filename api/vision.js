@@ -1,14 +1,14 @@
+import express from "express";
 import OpenAI from "openai";
 
+const router = express.Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export default async function handler(req, res) {
+router.post("/", async (req, res) => {
   try {
-    const { prompt, image_url } = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    const { prompt, image_url } = req.body;
 
-    // Prepend https:// if Bubble gives //
+    // Fix Bubble’s //cdn urls
     let fixedUrl = image_url;
     if (fixedUrl && fixedUrl.startsWith("//")) {
       fixedUrl = "https:" + fixedUrl;
@@ -27,13 +27,15 @@ export default async function handler(req, res) {
       ]
     });
 
-    res.status(200).json({
+    res.json({
       success: true,
       description: result.choices[0].message.content
     });
   } catch (error) {
-    console.error("Vision API error:", error);
+    console.error("Vision error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
-}
+});
+
+export default router;
 
