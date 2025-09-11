@@ -3,8 +3,7 @@
   "regions": ["lhr1"],
   "functions": {
     "api/**/*.js": {
-      "runtime": "@vercel/node"
+      "runtime": "@vercel/node@2.9.12"
     }
   }
 }
-
