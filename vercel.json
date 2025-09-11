@@ -10,6 +10,10 @@
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
       }
     }
-  ]
+  ],
+  "deploymentProtection": {
+    "enabled": false
+  }
 }
+
 
