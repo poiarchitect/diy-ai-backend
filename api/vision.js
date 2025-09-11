@@ -1,36 +1,45 @@
+import express from "express";
 import OpenAI from "openai";
 
+const router = express.Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export default async function handler(req, res) {
+router.post("/", async (req, res) => {
   try {
-    const { prompt, image_url } =
-      typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { prompt, image_url } = req.body;
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+    // Ensure the image URL is valid and starts with https://
+    let fixedUrl = image_url;
+    if (fixedUrl && fixedUrl.startsWith("//")) {
+      fixedUrl = "https:" + fixedUrl;
+    }
+    if (fixedUrl && !fixedUrl.startsWith("http")) {
+      fixedUrl = "https://" + fixedUrl;
+    }
+
+    const result = await client.chat.completions.create({
+      model: "gpt-4.1-mini",
       messages: [
         {
           role: "user",
           content: [
             { type: "text", text: prompt || "Describe this image" },
-            { type: "image_url", image_url: { url: image_url } },
-          ],
-        },
-      ],
-      max_tokens: 300,
+            { type: "image_url", image_url: { url: fixedUrl } }
+          ]
+        }
+      ]
     });
 
-    res.status(200).json({
+    res.json({
       success: true,
-      description: response.choices[0].message.content,
+      description: result.choices[0].message.content
     });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err.message || JSON.stringify(err),
-    });
+  } catch (error) {
+    console.error("Vision endpoint error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
-}
+});
+
+export default router;
 
 
