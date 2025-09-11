@@ -1,45 +1,37 @@
-import express from "express";
 import OpenAI from "openai";
 
-const router = express.Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-router.post("/", async (req, res) => {
+export default async function handler(req, res) {
   try {
-    const { prompt, image_url } = req.body;
+    const { prompt, image } = req.body;
 
-    if (!prompt || !image_url) {
-      return res.status(400).json({ success: false, error: "Missing prompt 
-or image_url" });
+    if (!image) {
+      return res.status(400).json({ error: "Missing image URL or file" });
     }
 
-    // Fix Bubble relative URLs
-    let finalUrl = image_url;
-    if (finalUrl.startsWith("//")) {
-      finalUrl = "https:" + finalUrl;
-    }
-
-    const result = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "user",
           content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: finalUrl } }
-          ]
-        }
-      ]
+            { type: "text", text: prompt || "Describe this image" },
+            { type: "image_url", image_url: { url: image } },
+          ],
+        },
+      ],
     });
 
-    const description = result.choices?.[0]?.message?.content || "";
-
-    res.json({ success: true, description });
+    res.status(200).json({ reply: response.choices[0].message.content });
   } catch (error) {
-    console.error("Vision endpoint error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error("Vision API Error:", error);
+    res.status(500).json({ error: "Vision request failed" });
   }
-});
+}
 
-export default router;
+export const config = {
+  runtime: "nodejs18.x",
+};
+
 
