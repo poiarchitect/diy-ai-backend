@@ -1,19 +1,11 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   try {
-    const { prompt, image_url } = req.body;
-
-    if (!prompt || !image_url) {
-      return res.status(400).json({ error: "Missing prompt or image_url" 
-});
-    }
-
-    console.log("🟢 Vision request received:", { prompt, image_url });
+    const { prompt, image_url } =
+      typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -21,24 +13,24 @@ export default async function handler(req, res) {
         {
           role: "user",
           content: [
-            { type: "text", text: prompt },
+            { type: "text", text: prompt || "Describe this image" },
             { type: "image_url", image_url: { url: image_url } },
           ],
         },
       ],
+      max_tokens: 300,
     });
-
-    console.log("🟢 OpenAI response:", JSON.stringify(response, null, 2));
 
     res.status(200).json({
+      success: true,
       description: response.choices[0].message.content,
     });
-  } catch (error) {
-    console.error("🔴 Vision API error:", error);
+  } catch (err) {
     res.status(500).json({
-      error: error.message,
-      details: error.response ? error.response.data : null,
+      success: false,
+      error: err.message || JSON.stringify(err),
     });
   }
 }
+
 
