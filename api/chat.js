@@ -4,7 +4,6 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   try {
-    // Always expect 'prompt' (aligns with image + vision calls)
     const { prompt } =
       typeof req.body === "string" ? JSON.parse(req.body) : req.body;
 
@@ -29,4 +28,10 @@ export default async function handler(req, res) {
     });
   }
 }
+
+export const config = {
+  runtime: "edge",
+  regions: ["all"],
+};
+
 
