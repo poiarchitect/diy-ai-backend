@@ -1,8 +1,9 @@
 {
   "version": 2,
-  "regions": ["lhr1"],
-  "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node" }
-  ]
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs18.x",
+      "regions": ["lhr1"]
+    }
+  }
 }
-
