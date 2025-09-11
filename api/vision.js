@@ -8,10 +8,15 @@ router.post("/", async (req, res) => {
   try {
     const { prompt, image_url } = req.body;
 
-    // Fix Bubble’s //cdn urls
-    let fixedUrl = image_url;
-    if (fixedUrl && fixedUrl.startsWith("//")) {
-      fixedUrl = "https:" + fixedUrl;
+    if (!prompt || !image_url) {
+      return res.status(400).json({ success: false, error: "Missing prompt 
+or image_url" });
+    }
+
+    // Fix Bubble relative URLs
+    let finalUrl = image_url;
+    if (finalUrl.startsWith("//")) {
+      finalUrl = "https:" + finalUrl;
     }
 
     const result = await client.chat.completions.create({
@@ -20,19 +25,18 @@ router.post("/", async (req, res) => {
         {
           role: "user",
           content: [
-            { type: "text", text: prompt || "Describe this image" },
-            { type: "image_url", image_url: { url: fixedUrl } }
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: finalUrl } }
           ]
         }
       ]
     });
 
-    res.json({
-      success: true,
-      description: result.choices[0].message.content
-    });
+    const description = result.choices?.[0]?.message?.content || "";
+
+    res.json({ success: true, description });
   } catch (error) {
-    console.error("Vision error:", error);
+    console.error("Vision endpoint error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
