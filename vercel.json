@@ -1,11 +1,4 @@
 {
   "version": 2,
-  "regions": ["lhr1"],
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  }
+  "regions": ["lhr1"]
 }
-
-
