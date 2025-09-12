@@ -7,27 +7,26 @@ export default async function handler(req, res) {
     const { image_url, question } = req.body || {};
 
     if (!image_url || !question) {
-      return res.status(400).json({ error: "Missing 'image_url' or 'question' in request" });
+      return res.status(400).json({ error: "Missing image_url or question" });
     }
 
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
+        model: "gpt-4.1-mini",   // supports image + text
+        input: [
           {
             role: "user",
             content: [
-              { type: "text", text: question },
-              { type: "image_url", image_url: { url: image_url } }
+              { type: "input_text", text: question },
+              { type: "input_image", image_url }
             ]
           }
-        ],
-        max_tokens: 300
+        ]
       })
     });
 
@@ -35,7 +34,8 @@ export default async function handler(req, res) {
     if (!r.ok) return res.status(r.status).json({ error: data });
 
     return res.status(200).json({
-      reply: data.choices?.[0]?.message?.content || "No response"
+      answer: data.output_text || "No answer",
+      usage: data.usage || null
     });
   } catch (err) {
     return res.status(500).json({ error: "Something went wrong in /api/vision" });
