@@ -1,52 +1,44 @@
-export const config = {
-  runtime: "edge",
-};
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
-export default async function handler(req) {
   try {
-    const { prompt, image_url } = await req.json();
+    const { image_url, question } = req.body || {};
 
-    if (!prompt || !image_url) {
-      return new Response(
-        JSON.stringify({ error: "Both 'prompt' and 'image_url' are required" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+    if (!image_url || !question) {
+      return res.status(400).json({ error: "Missing 'image_url' or 'question' in request" });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "user",
             content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: image_url } },
-            ],
-          },
+              { type: "text", text: question },
+              { type: "image_url", image_url: { url: image_url } }
+            ]
+          }
         ],
-      }),
+        max_tokens: 300
+      })
     });
 
-    const data = await response.json();
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: data });
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        reply: data?.choices?.[0]?.message?.content || "No response",
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return res.status(200).json({
+      reply: data.choices?.[0]?.message?.content || "No response"
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Something went wrong in /api/vision" });
   }
 }
 
