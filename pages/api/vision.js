@@ -7,12 +7,10 @@ export default async function handler(req, res) {
     const { prompt, image_url } = req.body;
 
     if (!prompt || !image_url) {
-      return res.status(400).json({ error: "Missing prompt or image_url" 
-});
+      return res.status(400).json({ error: "Missing prompt or image_url" });
     }
 
-    const response = await 
-fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -25,7 +23,7 @@ fetch("https://api.openai.com/v1/chat/completions", {
             role: "user",
             content: [
               { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: image_url } },
+              { type: "image_url", image_url: image_url },
             ],
           },
         ],
@@ -33,17 +31,9 @@ fetch("https://api.openai.com/v1/chat/completions", {
     });
 
     const data = await response.json();
-
-    if (data.error) {
-      return res.status(500).json({ error: data.error });
-    }
-
-    const reply = data.choices?.[0]?.message?.content || "No description 
-found.";
-    return res.status(200).json({ reply });
-
-  } catch (error) {
-    console.error("Vision API error:", error);
+    return res.status(200).json({ reply: data });
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 }
