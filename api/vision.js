@@ -1,8 +1,6 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -11,38 +9,50 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : 
-req.body;
-    const { prompt, image_url } = body;
+(req.body || {});
+    let { prompt, image_url, image_base64, image_data_url } = body;
 
-    if (!image_url) {
-      return res.status(400).json({ error: "Missing image URL" });
+    // sensible default
+    prompt = (prompt && String(prompt).trim()) || "Describe this image.";
+
+    // Normalize inputs
+    if (!image_url && image_data_url) image_url = image_data_url; // allow 
+either name
+    if (image_url && image_url.startsWith("//")) image_url = "https:" + 
+image_url; // Bubble temp URLs
+
+    let imagePart;
+    if (image_base64) {
+      // Accepts raw base64 or full data URL
+      const dataUrl = image_base64.startsWith("data:")
+        ? image_base64
+        : `data:image/png;base64,${image_base64}`;
+      imagePart = { type: "input_image", image_url: { url: dataUrl } };
+    } else if (image_url) {
+      imagePart = { type: "input_image", image_url: { url: image_url } };
+    } else {
+      return res.status(400).json({ error: "Provide image_url or 
+image_base64" });
     }
 
-    const result = await client.chat.completions.create({
+    const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "You are an AI that analyzes images." 
-},
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt || "Describe this image" },
-            { type: "image_url", image_url: { url: image_url } },
-          ],
-        },
-      ],
+        { role: "user", content: [{ type: "text", text: prompt }, 
+imagePart] }
+      ]
     });
 
-    res.status(200).json({
-      reply: result.choices[0].message.content,
-    });
+    const reply = completion.choices?.[0]?.message?.content?.trim() || "";
+    return res.status(200).json({ description: reply });
   } catch (err) {
-    console.error("Vision API error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("vision error:", err?.response?.data || err);
+    return res.status(500).json({
+      error: err?.response?.data?.error?.message || err.message || 
+"Internal error"
+    });
   }
 }
 
-export const config = {
-  runtime: "nodejs",
-};
+export const config = { runtime: "nodejs" };
 
