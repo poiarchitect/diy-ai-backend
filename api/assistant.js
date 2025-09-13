@@ -40,7 +40,7 @@ export default async function handler(req, res) {
       response.response_text = data.choices?.[0]?.message?.content || null;
     }
 
-    // 2) IMAGE GENERATION
+    // 2) IMAGE GENERATION (fixed — no response_format, always return both url + b64 if available)
     else if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -52,18 +52,16 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt: input,
           size: options.size || "1024x1024",
-          n: options.n || 1,
-          response_format: options.response_format || "url" // default: url
+          quality: options.quality || "standard",
+          n: options.n || 1
         })
       });
 
       const data = await r.json();
       if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response.response_image_url =
-        data.data?.[0]?.url || null;
-      response.response_b64 =
-        data.data?.[0]?.b64_json || null;
+      response.response_image_url = data.data?.[0]?.url || null;
+      response.response_b64 = data.data?.[0]?.b64_json || null;
     }
 
     // 3) VISION
@@ -100,8 +98,7 @@ export default async function handler(req, res) {
       const data = await r.json();
       if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response.response_vision_text =
-        data.choices?.[0]?.message?.content || null;
+      response.response_vision_text = data.choices?.[0]?.message?.content || null;
     }
 
     // 4) AUDIO
