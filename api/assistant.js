@@ -4,11 +4,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
+    const { type, input, options = {}, image_url } = req.body || {};
 
-    if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
+    if (!type || !input) {
+      return res.status(400).json({ error: "Missing 'type' or 'input'" });
+    }
 
+    let response;
+
+    // 1) CHAT
     if (type === "chat") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -18,15 +22,27 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }]
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are DIY AI Assistant. Only provide safe DIY guidance. Never give instructions for electricity, plumbing, or gas. Always recommend licensed professionals for those."
+            },
+            { role: "user", content: input }
+          ],
+          max_tokens: options.max_tokens || 500
         })
       });
+
       const data = await r.json();
-      return res.status(200).json({ reply: data?.choices?.[0]?.message?.content || null });
+      if (!r.ok) return res.status(r.status).json({ error: data });
+
+      response = { text: data.choices?.[0]?.message?.content || null };
     }
 
-    if (type === "image") {
-      const r = await fetch("https://api.openai.com/v1/images", {
+    // 2) IMAGE GENERATION
+    else if (type === "image") {
+      const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -34,18 +50,28 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: "gpt-image-1",
-          prompt,
-          size
+          prompt: input,
+          size: options.size || "1024x1024",
+          quality: options.quality || "standard",
+          background: options.background || "white"
         })
       });
+
       const data = await r.json();
-      return res.status(200).json({
-        image_url: data?.data?.[0]?.url || null,
-        b64: data?.data?.[0]?.b64_json || null
-      });
+      if (!r.ok) return res.status(r.status).json({ error: data });
+
+      response = {
+        image_url: data.data?.[0]?.url || null,
+        b64: data.data?.[0]?.b64_json || null
+      };
     }
 
-    if (type === "vision") {
+    // 3) VISION
+    else if (type === "vision") {
+      if (!image_url) {
+        return res.status(400).json({ error: "Missing 'image_url' for vision type" });
+      }
+
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -55,20 +81,83 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "gpt-4o-mini",
           messages: [
-            { role: "user", content: [
-              { type: "text", text: question },
-              { type: "image_url", image_url: { url: image_url } }
-            ]}
+            {
+              role: "system",
+              content:
+                "You are DIY AI Assistant with vision. Only describe and guide safe DIY tasks. Do NOT provide electrical, plumbing, or gas instructions."
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: input },
+                { type: "image_url", image_url: { url: image_url } }
+              ]
+            }
           ]
         })
       });
+
       const data = await r.json();
-      return res.status(200).json({ vision_reply: data?.choices?.[0]?.message?.content || null });
+      if (!r.ok) return res.status(r.status).json({ error: data });
+
+      response = { vision_text: data.choices?.[0]?.message?.content || null };
     }
 
-    return res.status(400).json({ error: `Unknown type: ${type}` });
+    // 4) AUDIO
+    else if (type === "audio") {
+      if (options.mode === "transcribe") {
+        // STT
+        const form = new FormData();
+        form.append("file", input); // input = audio file stream/buffer
+        form.append("model", "gpt-4o-mini-transcribe");
+
+        const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+          body: form
+        });
+
+        const data = await r.json();
+        if (!r.ok) return res.status(r.status).json({ error: data });
+
+        response = { text: data.text || null };
+      }
+
+      else if (options.mode === "speak") {
+        // TTS
+        const r = await fetch("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini-tts",
+            voice: options.voice || "alloy",
+            input
+          })
+        });
+
+        const buffer = Buffer.from(await r.arrayBuffer());
+        const audio_b64 = buffer.toString("base64");
+
+        response = { audio: `data:audio/mp3;base64,${audio_b64}` };
+      }
+
+      else {
+        return res.status(400).json({ error: "Missing or invalid 'mode' for audio type" });
+      }
+    }
+
+    // UNSUPPORTED
+    else {
+      return res.status(400).json({ error: `Unsupported type: ${type}` });
+    }
+
+    return res.status(200).json({ success: true, type, response });
   } catch (err) {
-    return res.status(500).json({ error: "Something went wrong", details: err.message });
+    console.error("Error in /api/assistant:", err);
+    return res.status(500).json({ error: "Internal server error", details: err.message });
   }
 }
 
