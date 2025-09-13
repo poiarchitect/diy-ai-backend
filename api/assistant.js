@@ -42,6 +42,20 @@ export default async function handler(req, res) {
 
     // 2) IMAGE GENERATION
     else if (type === "image") {
+      // validate user options
+      const allowedQualities = ["high", "standard"];
+      const allowedBackgrounds = ["transparent", "opaque", "auto"];
+
+      const quality = options.quality || "high";
+      const background = options.background || "transparent";
+
+      if (!allowedQualities.includes(quality)) {
+        return res.status(400).json({ error: `Invalid quality: ${quality}` });
+      }
+      if (!allowedBackgrounds.includes(background)) {
+        return res.status(400).json({ error: `Invalid background: ${background}` });
+      }
+
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
@@ -52,8 +66,8 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt: input,
           size: options.size || "1024x1024",
-          quality: options.quality || "standard",
-          background: options.background || "white"
+          quality,
+          background
         })
       });
 
@@ -98,7 +112,12 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
-      if (!r.ok) return res.status(r.status).json({ error: data });
+      if (!r.ok) {
+        return res.status(r.status).json({
+          error: data,
+          hint: "If you see `invalid_image_url`, the image host may block external downloads. Try another URL."
+        });
+      }
 
       response = { vision_text: data.choices?.[0]?.message?.content || null };
     }
