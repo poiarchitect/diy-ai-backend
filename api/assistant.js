@@ -52,6 +52,7 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt: input,
           size: options.size || "1024x1024",
+          quality: options.quality || "standard",
           n: options.n || 1,
           response_format: "url"
         })
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
     else if (type === "audio") {
       if (options.mode === "transcribe") {
         const form = new FormData();
-        form.append("file", input);
+        form.append("file", input); // input = file stream or buffer
         form.append("model", "gpt-4o-mini-transcribe");
 
         const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
