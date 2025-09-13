@@ -40,21 +40,27 @@ export default async function handler(req, res) {
       response.response_text = data.choices?.[0]?.message?.content || null;
     }
 
-    // 2) IMAGE GENERATION (fixed — no response_format, always return both url + b64 if available)
+    // 2) IMAGE GENERATION (fixed handling of quality)
     else if (type === "image") {
+      const body = {
+        model: "gpt-image-1",
+        prompt: input,
+        size: options.size || "1024x1024",
+        n: options.n || 1
+      };
+
+      // Only include quality if explicitly "high" (works only for 1024x1024)
+      if (options.quality === "high" && (options.size === "1024x1024" || !options.size)) {
+        body.quality = "high";
+      }
+
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
         },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt: input,
-          size: options.size || "1024x1024",
-          quality: options.quality || "standard",
-          n: options.n || 1
-        })
+        body: JSON.stringify(body)
       });
 
       const data = await r.json();
