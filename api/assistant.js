@@ -52,16 +52,18 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt: input,
           size: options.size || "1024x1024",
-          quality: options.quality || "standard",
           n: options.n || 1,
-          response_format: "url"
+          response_format: options.response_format || "url" // default: url
         })
       });
 
       const data = await r.json();
       if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response.response_image_url = data.data?.[0]?.url || null;
+      response.response_image_url =
+        data.data?.[0]?.url || null;
+      response.response_b64 =
+        data.data?.[0]?.b64_json || null;
     }
 
     // 3) VISION
@@ -98,14 +100,15 @@ export default async function handler(req, res) {
       const data = await r.json();
       if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response.response_vision_text = data.choices?.[0]?.message?.content || null;
+      response.response_vision_text =
+        data.choices?.[0]?.message?.content || null;
     }
 
     // 4) AUDIO
     else if (type === "audio") {
       if (options.mode === "transcribe") {
         const form = new FormData();
-        form.append("file", input); // input = file stream or buffer
+        form.append("file", input);
         form.append("model", "gpt-4o-mini-transcribe");
 
         const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
