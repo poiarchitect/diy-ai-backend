@@ -9,6 +9,7 @@ export default async function handler(req, res) {
 
     if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
 
+    // ---- Chat handler ----
     if (type === "chat") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -25,8 +26,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ reply: data?.choices?.[0]?.message?.content || null });
     }
 
+    // ---- Image handler ----
     if (type === "image") {
-      const r = await fetch("https://api.openai.com/v1/images", {
+      const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -45,6 +47,7 @@ export default async function handler(req, res) {
       });
     }
 
+    // ---- Vision handler ----
     if (type === "vision") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -69,7 +72,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ vision_reply: data?.choices?.[0]?.message?.content || null });
     }
 
+    // ---- Fallback ----
     return res.status(400).json({ error: `Unknown type: ${type}` });
+
   } catch (err) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
