@@ -4,12 +4,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message, image_prompt, image_url, question } = req.body || {};
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
 
-    let response;
+    if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
 
-    // Case 1: Image generation
-    if (image_prompt) {
+    if (type === "chat") {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      const data = await r.json();
+      return res.status(200).json({ reply: data?.choices?.[0]?.message?.content || null });
+    }
+
+    if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images", {
         method: "POST",
         headers: {
@@ -18,23 +34,18 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: "gpt-image-1",
-          prompt: image_prompt,
-          size: "1024x1024"
+          prompt,
+          size
         })
       });
-
       const data = await r.json();
-      if (!r.ok) return res.status(r.status).json({ error: data });
-
-      const output_url = data?.data?.[0]?.url || null;
-      const b64 = data?.data?.[0]?.b64_json || null;
-      const data_url = b64 ? `data:image/png;base64,${b64}` : null;
-
-      response = { type: "image", output_url, data_url };
+      return res.status(200).json({
+        image_url: data?.data?.[0]?.url || null,
+        b64: data?.data?.[0]?.b64_json || null
+      });
     }
 
-    // Case 2: Vision (analyze an image with a question)
-    else if (image_url && question) {
+    if (type === "vision") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -44,52 +55,20 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "gpt-4o-mini",
           messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: question },
-                { type: "image_url", image_url: { url: image_url } }
-              ]
-            }
+            { role: "user", content: [
+              { type: "text", text: question },
+              { type: "image_url", image_url: { url: image_url } }
+            ]}
           ]
         })
       });
-
       const data = await r.json();
-      if (!r.ok) return res.status(r.status).json({ error: data });
-
-      response = { type: "vision", text: data.choices[0].message.content };
+      return res.status(200).json({ vision_reply: data?.choices?.[0]?.message?.content || null });
     }
 
-    // Case 3: Default = text chat
-    else if (message) {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: message }]
-        })
-      });
-
-      const data = await r.json();
-      if (!r.ok) return res.status(r.status).json({ error: data });
-
-      response = { type: "chat", text: data.choices[0].message.content };
-    }
-
-    else {
-      return res.status(400).json({ error: "Invalid request body" });
-    }
-
-    return res.status(200).json(response);
-
+    return res.status(400).json({ error: `Unknown type: ${type}` });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Something went wrong in /api/assistant" });
+    return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
 
