@@ -40,19 +40,32 @@ export default async function handler(req, res) {
       response.response_text = data.choices?.[0]?.message?.content || null;
     }
 
-    // 2) IMAGE GENERATION (fixed handling of quality)
+    // 2) IMAGE GENERATION (normalize options to always be valid)
     else if (type === "image") {
-      const body = {
+      const ALLOWED_SIZES = new Set(["1024x1024", "1024x1536", "1536x1024", "auto"]);
+      const ALLOWED_QUALITIES = new Set(["low", "medium", "high", "auto"]);
+
+      const rawSize = typeof options.size === "string" ? options.size.trim() : "";
+      const size = ALLOWED_SIZES.has(rawSize) ? rawSize : "1024x1024";
+
+      const rawQuality = typeof options.quality === "string" ? options.quality.trim() : "";
+      const quality = ALLOWED_QUALITIES.has(rawQuality) ? rawQuality : null;
+
+      const background = options.background === "transparent" ? "transparent" : null;
+
+      let n = 1;
+      if (typeof options.n === "number" && options.n >= 1 && options.n <= 4) {
+        n = Math.floor(options.n);
+      }
+
+      const imgPayload = {
         model: "gpt-image-1",
         prompt: input,
-        size: options.size || "1024x1024",
-        n: options.n || 1
+        size,
+        n
       };
-
-      // Only include quality if explicitly "high" (works only for 1024x1024)
-      if (options.quality === "high" && (options.size === "1024x1024" || !options.size)) {
-        body.quality = "high";
-      }
+      if (quality) imgPayload.quality = quality;
+      if (background) imgPayload.background = background;
 
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -60,7 +73,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(imgPayload)
       });
 
       const data = await r.json();
@@ -107,50 +120,7 @@ export default async function handler(req, res) {
       response.response_vision_text = data.choices?.[0]?.message?.content || null;
     }
 
-    // 4) AUDIO
-    else if (type === "audio") {
-      if (options.mode === "transcribe") {
-        const form = new FormData();
-        form.append("file", input);
-        form.append("model", "gpt-4o-mini-transcribe");
-
-        const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: form
-        });
-
-        const data = await r.json();
-        if (!r.ok) return res.status(r.status).json({ error: data });
-
-        response.response_text = data.text || null;
-      }
-
-      else if (options.mode === "speak") {
-        const r = await fetch("https://api.openai.com/v1/audio/speech", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini-tts",
-            voice: options.voice || "alloy",
-            input
-          })
-        });
-
-        const buffer = Buffer.from(await r.arrayBuffer());
-        const audio_b64 = buffer.toString("base64");
-
-        response.response_audio = `data:audio/mp3;base64,${audio_b64}`;
-      }
-
-      else {
-        return res.status(400).json({ error: "Missing or invalid 'mode' for audio type" });
-      }
-    }
-
+    // Unsupported type
     else {
       return res.status(400).json({ error: `Unsupported type: ${type}` });
     }
