@@ -52,8 +52,8 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt: input,
           size: options.size || "1024x1024",
-          quality: options.quality || "standard",
-          background: options.background || "white"
+          n: options.n || 1,
+          response_format: "url"
         })
       });
 
@@ -61,7 +61,6 @@ export default async function handler(req, res) {
       if (!r.ok) return res.status(r.status).json({ error: data });
 
       response.response_image_url = data.data?.[0]?.url || null;
-      response.response_b64 = data.data?.[0]?.b64_json || null;
     }
 
     // 3) VISION
