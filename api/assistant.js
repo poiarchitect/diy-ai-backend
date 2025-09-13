@@ -103,52 +103,6 @@ export default async function handler(req, res) {
       response = { vision_text: data.choices?.[0]?.message?.content || null };
     }
 
-    // 4) AUDIO
-    else if (type === "audio") {
-      if (options.mode === "transcribe") {
-        // STT
-        const form = new FormData();
-        form.append("file", input); // input = audio file stream/buffer
-        form.append("model", "gpt-4o-mini-transcribe");
-
-        const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-          body: form
-        });
-
-        const data = await r.json();
-        if (!r.ok) return res.status(r.status).json({ error: data });
-
-        response = { text: data.text || null };
-      }
-
-      else if (options.mode === "speak") {
-        // TTS
-        const r = await fetch("https://api.openai.com/v1/audio/speech", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini-tts",
-            voice: options.voice || "alloy",
-            input
-          })
-        });
-
-        const buffer = Buffer.from(await r.arrayBuffer());
-        const audio_b64 = buffer.toString("base64");
-
-        response = { audio: `data:audio/mp3;base64,${audio_b64}` };
-      }
-
-      else {
-        return res.status(400).json({ error: "Missing or invalid 'mode' for audio type" });
-      }
-    }
-
     // UNSUPPORTED
     else {
       return res.status(400).json({ error: `Unsupported type: ${type}` });
