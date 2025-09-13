@@ -10,7 +10,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing 'type' or 'input'" });
     }
 
-    let response;
+    let response = {};
 
     // 1) CHAT
     if (type === "chat") {
@@ -37,25 +37,11 @@ export default async function handler(req, res) {
       const data = await r.json();
       if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response = { text: data.choices?.[0]?.message?.content || null };
+      response.response_text = data.choices?.[0]?.message?.content || null;
     }
 
     // 2) IMAGE GENERATION
     else if (type === "image") {
-      // validate user options
-      const allowedQualities = ["high", "standard"];
-      const allowedBackgrounds = ["transparent", "opaque", "auto"];
-
-      const quality = options.quality || "high";
-      const background = options.background || "transparent";
-
-      if (!allowedQualities.includes(quality)) {
-        return res.status(400).json({ error: `Invalid quality: ${quality}` });
-      }
-      if (!allowedBackgrounds.includes(background)) {
-        return res.status(400).json({ error: `Invalid background: ${background}` });
-      }
-
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
@@ -66,18 +52,16 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt: input,
           size: options.size || "1024x1024",
-          quality,
-          background
+          quality: options.quality || "standard",
+          background: options.background || "white"
         })
       });
 
       const data = await r.json();
       if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response = {
-        image_url: data.data?.[0]?.url || null,
-        b64: data.data?.[0]?.b64_json || null
-      };
+      response.response_image_url = data.data?.[0]?.url || null;
+      response.response_b64 = data.data?.[0]?.b64_json || null;
     }
 
     // 3) VISION
@@ -112,25 +96,62 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
-      if (!r.ok) {
-        return res.status(r.status).json({
-          error: data,
-          hint: "If you see `invalid_image_url`, the image host may block external downloads. Try another URL."
-        });
-      }
+      if (!r.ok) return res.status(r.status).json({ error: data });
 
-      response = { vision_text: data.choices?.[0]?.message?.content || null };
+      response.response_vision_text = data.choices?.[0]?.message?.content || null;
     }
 
-    // UNSUPPORTED
+    // 4) AUDIO
+    else if (type === "audio") {
+      if (options.mode === "transcribe") {
+        const form = new FormData();
+        form.append("file", input);
+        form.append("model", "gpt-4o-mini-transcribe");
+
+        const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+          body: form
+        });
+
+        const data = await r.json();
+        if (!r.ok) return res.status(r.status).json({ error: data });
+
+        response.response_text = data.text || null;
+      }
+
+      else if (options.mode === "speak") {
+        const r = await fetch("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini-tts",
+            voice: options.voice || "alloy",
+            input
+          })
+        });
+
+        const buffer = Buffer.from(await r.arrayBuffer());
+        const audio_b64 = buffer.toString("base64");
+
+        response.response_audio = `data:audio/mp3;base64,${audio_b64}`;
+      }
+
+      else {
+        return res.status(400).json({ error: "Missing or invalid 'mode' for audio type" });
+      }
+    }
+
     else {
       return res.status(400).json({ error: `Unsupported type: ${type}` });
     }
 
-    return res.status(200).json({ success: true, type, response });
+    return res.status(200).json({ success: true, type, ...response });
   } catch (err) {
     console.error("Error in /api/assistant:", err);
     return res.status(500).json({ error: "Internal server error", details: err.message });
   }
 }
-
