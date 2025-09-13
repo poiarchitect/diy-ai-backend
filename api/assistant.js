@@ -63,13 +63,16 @@ export default async function handler(req, res) {
       response.response_text = data.choices?.[0]?.message?.content || null;
     }
 
-    // 2) IMAGE GENERATION
+    // 2) IMAGE GENERATION (use only allowed values: low, medium, high, auto)
     else if (type === "image") {
       const ALLOWED_SIZES = new Set(["1024x1024", "1024x1536", "1536x1024"]);
       const rawSize = typeof options.size === "string" ? options.size.trim() : "";
       const size = ALLOWED_SIZES.has(rawSize) ? rawSize : "1024x1024";
 
-      const quality = options.quality === "hd" ? "hd" : "standard";
+      const ALLOWED_QUALITIES = new Set(["low", "medium", "high", "auto"]);
+      const rawQuality = typeof options.quality === "string" ? options.quality.trim() : "";
+      const quality = ALLOWED_QUALITIES.has(rawQuality) ? rawQuality : "medium";
+
       const n = typeof options.n === "number" && options.n >= 1 && options.n <= 4 ? Math.floor(options.n) : 1;
 
       const imgPayload = {
