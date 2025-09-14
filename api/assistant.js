@@ -44,21 +44,25 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt,
           size: size || "1024x1024",
-          response_format: "url"
+          n: 1
         })
       });
 
       const data = await r.json();
 
-      if (!data?.data) {
-        return res.status(400).json({
-          error: data?.error || "Unknown error from OpenAI",
+      if (!r.ok) {
+        return res.status(r.status).json({
+          error: data?.error?.message || "OpenAI error",
           raw: data
         });
       }
 
+      const url = data?.data?.[0]?.url || null;
+      const b64 = data?.data?.[0]?.b64_json || null;
+      const dataUrl = url ?? (b64 ? `data:image/png;base64,${b64}` : null);
+
       return res.status(200).json({
-        response_image_url: data.data[0].url,
+        response_image_url: dataUrl,
         raw: data
       });
     }
@@ -102,4 +106,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
