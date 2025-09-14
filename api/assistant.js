@@ -27,7 +27,8 @@ export default async function handler(req, res) {
 
       const data = await r.json();
       return res.status(200).json({
-        reply: data?.choices?.[0]?.message?.content || null
+        reply: data?.choices?.[0]?.message?.content || null,
+        raw: data
       });
     }
 
@@ -42,14 +43,23 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "gpt-image-1",
           prompt,
-          size,
+          size: size || "1024x1024",
           response_format: "url"
         })
       });
 
       const data = await r.json();
+
+      if (!data?.data) {
+        return res.status(400).json({
+          error: data?.error || "Unknown error from OpenAI",
+          raw: data
+        });
+      }
+
       return res.status(200).json({
-        response_image_url: data?.data?.[0]?.url || null
+        response_image_url: data.data[0].url,
+        raw: data
       });
     }
 
@@ -77,7 +87,8 @@ export default async function handler(req, res) {
 
       const data = await r.json();
       return res.status(200).json({
-        vision_reply: data?.choices?.[0]?.message?.content || null
+        vision_reply: data?.choices?.[0]?.message?.content || null,
+        raw: data
       });
     }
 
@@ -91,3 +102,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
