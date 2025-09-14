@@ -27,12 +27,11 @@ export default async function handler(req, res) {
 
       const data = await r.json();
       return res.status(200).json({
-        reply: data?.choices?.[0]?.message?.content || null,
-        raw: data
+        reply: data?.choices?.[0]?.message?.content || null
       });
     }
 
-    // --- Image handler ---
+    // --- Image handler (URL only, Bubble-ready) ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -43,27 +42,22 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "gpt-image-1",
           prompt,
-          size: size || "1024x1024",
+          size,
+          response_format: "url",
           n: 1
         })
       });
 
       const data = await r.json();
 
-      if (!r.ok) {
+      if (!r.ok || !data?.data?.[0]?.url) {
         return res.status(r.status).json({
-          error: data?.error?.message || "OpenAI error",
-          raw: data
+          error: data?.error?.message || "OpenAI image generation failed"
         });
       }
 
-      const url = data?.data?.[0]?.url || null;
-      const b64 = data?.data?.[0]?.b64_json || null;
-      const dataUrl = url ?? (b64 ? `data:image/png;base64,${b64}` : null);
-
       return res.status(200).json({
-        response_image_url: dataUrl,
-        raw: data
+        response_image_url: data.data[0].url
       });
     }
 
@@ -91,8 +85,7 @@ export default async function handler(req, res) {
 
       const data = await r.json();
       return res.status(200).json({
-        vision_reply: data?.choices?.[0]?.message?.content || null,
-        raw: data
+        vision_reply: data?.choices?.[0]?.message?.content || null
       });
     }
 
@@ -106,3 +99,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
