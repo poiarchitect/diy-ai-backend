@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 import FormData from "form-data";
-import { Readable } from "stream";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -44,7 +43,8 @@ export default async function handler(req, res) {
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-          { role: "user",
+          {
+            role: "user",
             content: [
               { type: "text", text: question },
               { type: "image_url", image_url: { url: image_url } }
@@ -55,15 +55,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ vision_reply: response.choices?.[0]?.message?.content || null });
     }
 
-    // --- Image Edit (manual fetch with form-data) ---
+    // --- Image Edit ---
     if (type === "image_edit") {
       try {
         const imgRes = await fetch(image_url);
-        if (!imgRes.ok) return res.status(400).json({ error: "Could not fetch image from provided URL" });
+        if (!imgRes.ok) {
+          return res.status(400).json({ error: "Could not fetch image from provided URL" });
+        }
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
         const form = new FormData();
-        form.append("image", Readable.from(imgBuffer), { filename: "upload.png", contentType: "image/png" });
+        form.append("image", imgBuffer, { filename: "upload.png", contentType: "image/png" });
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
@@ -76,7 +78,9 @@ export default async function handler(req, res) {
 
         const data = await r.json();
         const first = data?.data?.[0];
-        if (!r.ok || !first) return res.status(r.status || 400).json({ error: data?.error?.message || "OpenAI image edit failed", raw: data });
+        if (!r.ok || !first) {
+          return res.status(r.status || 400).json({ error: data?.error?.message || "OpenAI image edit failed", raw: data });
+        }
 
         const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
         return res.status(200).json({ response_image_url: url });
@@ -85,10 +89,10 @@ export default async function handler(req, res) {
       }
     }
 
+    // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
 
   } catch (err) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
