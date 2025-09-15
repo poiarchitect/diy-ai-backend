@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import sharp from "sharp";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -64,9 +65,19 @@ export default async function handler(req, res) {
 
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Use native FormData + File
+        // Convert to PNG, resize max 1024x1024, compress under 4MB
+        const pngBuffer = await sharp(imgBuffer)
+          .resize({ width: 1024, height: 1024, fit: "inside" })
+          .png({ quality: 90 })
+          .toBuffer();
+
+        if (pngBuffer.length > 4 * 1024 * 1024) {
+          return res.status(400).json({ error: "Image too large after conversion (>4MB). Please upload a smaller image." });
+        }
+
+        // Build form-data
         const form = new FormData();
-        const file = new File([imgBuffer], "upload.png", { type: "image/png" });
+        const file = new File([pngBuffer], "upload.png", { type: "image/png" });
         form.append("image", file);
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
