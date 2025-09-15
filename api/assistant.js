@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import FormData from "form-data";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -24,7 +23,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ reply: response.choices?.[0]?.message?.content || null });
     }
 
-    // --- Image ---
+    // --- Image Generation ---
     if (type === "image") {
       const response = await openai.images.generate({
         model: "gpt-image-1",
@@ -62,17 +61,20 @@ export default async function handler(req, res) {
         if (!imgRes.ok) {
           return res.status(400).json({ error: "Could not fetch image from provided URL" });
         }
+
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
+        // Use native FormData + File
         const form = new FormData();
-        form.append("image", imgBuffer, { filename: "upload.png", contentType: "image/png" });
+        const file = new File([imgBuffer], "upload.png", { type: "image/png" });
+        form.append("image", file);
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
 
         const r = await fetch("https://api.openai.com/v1/images/edits", {
           method: "POST",
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
+          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
           body: form
         });
 
