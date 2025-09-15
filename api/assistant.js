@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- Image handler (Bubble-ready) ---
+    // --- Image handler (force URL only) ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -43,7 +43,8 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt,
           size: size || "1024x1024",
-          n: 1
+          n: 1,
+          response_format: "url"
         })
       });
 
@@ -51,8 +52,7 @@ export default async function handler(req, res) {
 
       if (!r.ok || !data?.data?.[0]?.url) {
         return res.status(r.status).json({
-          error: data?.error?.message || "OpenAI image generation failed",
-          raw: data
+          error: data?.error?.message || "OpenAI image generation failed"
         });
       }
 
@@ -99,3 +99,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
