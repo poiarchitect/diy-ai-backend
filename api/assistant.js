@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- Image (force URL only, Bubble-ready) ---
+    // --- Image (URL only, Bubble-ready) ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -40,8 +40,7 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt,
           size,
-          n: 1,
-          response_format: "url"
+          n: 1
         })
       });
 
@@ -89,4 +88,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
