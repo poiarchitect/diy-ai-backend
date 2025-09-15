@@ -1,3 +1,6 @@
+import FormData from "form-data";
+import sharp from "sharp";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -5,13 +8,7 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const {
-      type,
-      prompt,
-      image_url,
-      question,
-      size = "1024x1024"
-    } = body || {};
+    const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
 
     if (!type) {
       return res.status(400).json({ error: "Missing 'type' in request body" });
@@ -106,13 +103,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Could not fetch uploaded image" });
       }
 
-      const imgBuffer = await imgRes.arrayBuffer();
+      const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-      // Always send as PNG (OpenAI edits endpoint only supports PNG)
-      const blob = new Blob([imgBuffer], { type: "image/png" });
+      // Convert to PNG using sharp
+      const pngBuffer = await sharp(imgBuffer).png().toBuffer();
 
       const form = new FormData();
-      form.append("image", blob, "upload.png");
+      form.append("image", pngBuffer, {
+        filename: "upload.png",
+        contentType: "image/png"
+      });
       form.append("prompt", prompt);
       form.append("size", size);
       form.append("n", "1");
@@ -152,3 +152,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
