@@ -105,11 +105,16 @@ export default async function handler(req, res) {
       if (!imgRes.ok) {
         return res.status(400).json({ error: "Could not fetch uploaded image" });
       }
+
       const imgBuffer = await imgRes.arrayBuffer();
-      const blob = new Blob([imgBuffer]);
+
+      // Detect or default MIME type
+      const contentType = imgRes.headers.get("content-type") || "image/png";
+      const ext = contentType.includes("jpeg") ? "jpg" : "png";
+      const file = new Blob([imgBuffer], { type: contentType });
 
       const form = new FormData();
-      form.append("image", blob, "upload.png");
+      form.append("image", file, `upload.${ext}`);
       form.append("prompt", prompt);
       form.append("size", size);
       form.append("n", "1");
@@ -149,3 +154,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
