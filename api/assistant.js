@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- Image (Bubble-ready, URL only) ---
+    // --- Image (Bubble-ready: return URL if available, else data URL) ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -45,13 +45,18 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
+      const first = data?.data?.[0];
 
-      // Fail cleanly if URL missing
-      const url = data?.data?.[0]?.url;
-      if (!r.ok || !url) {
-        return res.status(400).json({
-          error: "OpenAI did not return an image URL"
+      if (!r.ok || !first) {
+        return res.status(r.status || 400).json({
+          error: data?.error?.message || "OpenAI image generation failed"
         });
+      }
+
+      // Prefer hosted URL, else build a data URL from base64
+      const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
+      if (!url) {
+        return res.status(400).json({ error: "OpenAI did not return usable image content" });
       }
 
       return res.status(200).json({
@@ -87,10 +92,6 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: `Unknown type: ${type}` });
   } catch (err) {
-    return res.status(500).json({
-      error: "Something went wrong",
-      details: err.message
-    });
+    return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
