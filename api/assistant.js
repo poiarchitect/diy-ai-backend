@@ -108,13 +108,11 @@ export default async function handler(req, res) {
 
       const imgBuffer = await imgRes.arrayBuffer();
 
-      // Detect or default MIME type
-      const contentType = imgRes.headers.get("content-type") || "image/png";
-      const ext = contentType.includes("jpeg") ? "jpg" : "png";
-      const file = new Blob([imgBuffer], { type: contentType });
+      // Always send as PNG (OpenAI edits endpoint only supports PNG)
+      const blob = new Blob([imgBuffer], { type: "image/png" });
 
       const form = new FormData();
-      form.append("image", file, `upload.${ext}`);
+      form.append("image", blob, "upload.png");
       form.append("prompt", prompt);
       form.append("size", size);
       form.append("n", "1");
@@ -154,4 +152,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
