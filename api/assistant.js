@@ -1,4 +1,5 @@
 import FormData from "form-data";
+import { Readable } from "stream";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -92,20 +93,21 @@ export default async function handler(req, res) {
     // --- Image Edit ---
     if (type === "image_edit") {
       try {
-        const headRes = await fetch(image_url, { method: "HEAD" });
-        const sizeBytes = headRes.headers.get("content-length");
-        if (sizeBytes && Number(sizeBytes) > 4 * 1024 * 1024) {
-          return res.status(400).json({ error: "Image too large (>4MB). Please upload a smaller one." });
-        }
-
+        // Fetch the image from URL
         const imgRes = await fetch(image_url);
         if (!imgRes.ok) {
           return res.status(400).json({ error: "Could not fetch image from provided URL" });
         }
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
+        // Wrap buffer into a stream so it's treated as a file
+        const stream = Readable.from(imgBuffer);
+
         const form = new FormData();
-        form.append("image", imgBuffer, { filename: "upload.png", contentType: "image/png" });
+        form.append("image", stream, {
+          filename: "upload.png",
+          contentType: "image/png"
+        });
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
@@ -136,9 +138,10 @@ export default async function handler(req, res) {
       }
     }
 
+    // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
+
   } catch (err) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
