@@ -1,26 +1,16 @@
-import sharp from "sharp";
-import FormData from "form-data";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : 
-req.body;
-    const { type, prompt, image_url, question, size = "1024x1024" } = body 
-|| {};
-
-    if (!type) {
-      return res.status(400).json({ error: "Missing 'type' in request 
-body" });
-    }
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
+    if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
 
     // --- Chat ---
     if (type === "chat") {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", 
-{
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -33,20 +23,14 @@ body" });
       });
 
       const data = await r.json();
-      if (!r.ok) {
-        return res.status(r.status).json({ error: data?.error?.message || 
-"Chat request failed" });
-      }
-
       return res.status(200).json({
         reply: data?.choices?.[0]?.message?.content || null
       });
     }
 
-    // --- Image (Bubble-ready: URL if possible, fallback to base64) ---
+    // --- Image (Bubble-ready: return URL if available, else data URL) ---
     if (type === "image") {
-      const r = await 
-fetch("https://api.openai.com/v1/images/generations", {
+      const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,24 +45,28 @@ fetch("https://api.openai.com/v1/images/generations", {
       });
 
       const data = await r.json();
-      const url = data?.data?.[0]?.url || null;
-      const b64 = data?.data?.[0]?.b64_json ? 
-`data:image/png;base64,${data.data[0].b64_json}` : null;
+      const first = data?.data?.[0];
 
-      if (!r.ok || (!url && !b64)) {
-        return res.status(r.status).json({
-          error: data?.error?.message || "OpenAI did not return an image",
-          raw: data
+      if (!r.ok || !first) {
+        return res.status(r.status || 400).json({
+          error: data?.error?.message || "OpenAI image generation failed"
         });
       }
 
-      return res.status(200).json({ response_image_url: url || b64 });
+      // Prefer hosted URL, else build a data URL from base64
+      const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
+      if (!url) {
+        return res.status(400).json({ error: "OpenAI did not return usable image content" });
+      }
+
+      return res.status(200).json({
+        response_image_url: url
+      });
     }
 
-    // --- Vision (describe an uploaded image) ---
+    // --- Vision ---
     if (type === "vision") {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", 
-{
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -86,92 +74,24 @@ fetch("https://api.openai.com/v1/images/generations", {
         },
         body: JSON.stringify({
           model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: question },
-                { type: "image_url", image_url: { url: image_url } }
-              ]
-            }
-          ]
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: question },
+              { type: "image_url", image_url: { url: image_url } }
+            ]
+          }]
         })
       });
 
       const data = await r.json();
-      if (!r.ok) {
-        return res.status(r.status).json({ error: data?.error?.message || 
-"Vision request failed" });
-      }
-
       return res.status(200).json({
         vision_reply: data?.choices?.[0]?.message?.content || null
       });
     }
 
-    // --- Image Edit (reimagine an uploaded image with prompt) ---
-    if (type === "image_edit") {
-      try {
-        const imgRes = await fetch(image_url);
-        if (!imgRes.ok) {
-          return res.status(400).json({ error: "Could not fetch uploaded 
-image" });
-        }
-
-        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-
-        // Convert to PNG with sharp (max 1024x1024, under 4MB)
-        const pngBuffer = await sharp(imgBuffer)
-          .resize({ width: 1024, height: 1024, fit: "inside" })
-          .png()
-          .toBuffer();
-
-        if (pngBuffer.length > 4 * 1024 * 1024) {
-          return res.status(400).json({ error: "Image too large after 
-conversion (>4MB)" });
-        }
-
-        const form = new FormData();
-        form.append("image", pngBuffer, { filename: "upload.png", 
-contentType: "image/png" });
-        form.append("prompt", prompt);
-        form.append("size", size);
-        form.append("n", "1");
-
-        const r = await fetch("https://api.openai.com/v1/images/edits", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            ...form.getHeaders()
-          },
-          body: form
-        });
-
-        const data = await r.json();
-        const url = data?.data?.[0]?.url || null;
-        const b64 = data?.data?.[0]?.b64_json ? 
-`data:image/png;base64,${data.data[0].b64_json}` : null;
-
-        if (!r.ok || (!url && !b64)) {
-          return res.status(r.status).json({
-            error: data?.error?.message || "OpenAI did not return an 
-edited image",
-            raw: data
-          });
-        }
-
-        return res.status(200).json({ response_image_url: url || b64 });
-      } catch (err) {
-        return res.status(500).json({ error: "Image edit failed", details: 
-err.message });
-      }
-    }
-
-    // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
   } catch (err) {
-    return res.status(500).json({ error: "Something went wrong", details: 
-err.message });
+    return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
