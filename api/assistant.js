@@ -8,7 +8,6 @@ export default async function handler(req, res) {
     const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
     if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
 
-    // --- Chat ---
     if (type === "chat") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -21,11 +20,13 @@ export default async function handler(req, res) {
           messages: [{ role: "user", content: prompt }]
         })
       });
+
       const data = await r.json();
-      return res.status(200).json({ reply: data?.choices?.[0]?.message?.content || null });
+      return res.status(200).json({
+        reply: data?.choices?.[0]?.message?.content || null
+      });
     }
 
-    // --- Image (return URL if available, else data: URL) ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -36,27 +37,23 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "gpt-image-1",
           prompt,
-          size,     // "1024x1024" by default
+          size,
           n: 1
-          // NOTE: do NOT send response_format (it triggers "Unknown parameter")
         })
       });
 
       const data = await r.json();
-      if (!r.ok || !data?.data?.[0]) {
+      if (!r.ok || !data?.data?.[0]?.url) {
         return res.status(r.status).json({
           error: data?.error?.message || "OpenAI image generation failed"
         });
       }
 
-      const url = data.data[0].url || null;
-      const b64 = data.data[0].b64_json || null;
-      const dataUrl = url ?? (b64 ? `data:image/png;base64,${b64}` : null);
-
-      return res.status(200).json({ response_image_url: dataUrl });
+      return res.status(200).json({
+        response_image_url: data.data[0].url
+      });
     }
 
-    // --- Vision ---
     if (type === "vision") {
       const r = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -75,12 +72,18 @@ export default async function handler(req, res) {
           }]
         })
       });
+
       const data = await r.json();
-      return res.status(200).json({ vision_reply: data?.choices?.[0]?.message?.content || null });
+      return res.status(200).json({
+        vision_reply: data?.choices?.[0]?.message?.content || null
+      });
     }
 
     return res.status(400).json({ error: `Unknown type: ${type}` });
   } catch (err) {
-    return res.status(500).json({ error: "Something went wrong", details: err.message });
+    return res.status(500).json({
+      error: "Something went wrong",
+      details: err.message
+    });
   }
 }
