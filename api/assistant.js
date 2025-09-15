@@ -67,20 +67,23 @@ export default async function handler(req, res) {
     // --- Image Edit ---
     if (type === "image_edit") {
       try {
-        // Fetch the image into a buffer
+        // Fetch image from provided URL
         const imgRes = await fetch(image_url);
         if (!imgRes.ok) {
           return res.status(400).json({ error: "Could not fetch image from provided URL" });
         }
-        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Send buffer directly to OpenAI SDK
+        // Convert to Uint8Array for SDK compatibility
+        const arrayBuffer = await imgRes.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        // Call OpenAI edits endpoint
         const response = await openai.images.edits({
           model: "gpt-image-1",
           image: [
             {
               name: "upload.png",
-              buffer: imgBuffer
+              buffer: uint8Array
             }
           ],
           prompt: prompt || "",
