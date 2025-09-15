@@ -7,22 +7,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const {
-      type,
-      prompt,
-      image_url,
-      question,
-      size = "1024x1024"
-    } = body || {};
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : 
+req.body;
+    const { type, prompt, image_url, question, size = "1024x1024" } = body 
+|| {};
 
     if (!type) {
-      return res.status(400).json({ error: "Missing 'type' in request body" });
+      return res.status(400).json({ error: "Missing 'type' in request 
+body" });
     }
 
     // --- Chat ---
     if (type === "chat") {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", 
+{
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -35,6 +33,11 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
+      if (!r.ok) {
+        return res.status(r.status).json({ error: data?.error?.message || 
+"Chat request failed" });
+      }
+
       return res.status(200).json({
         reply: data?.choices?.[0]?.message?.content || null
       });
@@ -42,7 +45,8 @@ export default async function handler(req, res) {
 
     // --- Image (Bubble-ready: URL if possible, fallback to base64) ---
     if (type === "image") {
-      const r = await fetch("https://api.openai.com/v1/images/generations", {
+      const r = await 
+fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,9 +62,8 @@ export default async function handler(req, res) {
 
       const data = await r.json();
       const url = data?.data?.[0]?.url || null;
-      const b64 = data?.data?.[0]?.b64_json
-        ? `data:image/png;base64,${data.data[0].b64_json}`
-        : null;
+      const b64 = data?.data?.[0]?.b64_json ? 
+`data:image/png;base64,${data.data[0].b64_json}` : null;
 
       if (!r.ok || (!url && !b64)) {
         return res.status(r.status).json({
@@ -69,14 +72,13 @@ export default async function handler(req, res) {
         });
       }
 
-      return res.status(200).json({
-        response_image_url: url || b64
-      });
+      return res.status(200).json({ response_image_url: url || b64 });
     }
 
     // --- Vision (describe an uploaded image) ---
     if (type === "vision") {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      const r = await fetch("https://api.openai.com/v1/chat/completions", 
+{
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -97,6 +99,11 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
+      if (!r.ok) {
+        return res.status(r.status).json({ error: data?.error?.message || 
+"Vision request failed" });
+      }
+
       return res.status(200).json({
         vision_reply: data?.choices?.[0]?.message?.content || null
       });
@@ -107,7 +114,8 @@ export default async function handler(req, res) {
       try {
         const imgRes = await fetch(image_url);
         if (!imgRes.ok) {
-          return res.status(400).json({ error: "Could not fetch uploaded image" });
+          return res.status(400).json({ error: "Could not fetch uploaded 
+image" });
         }
 
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
@@ -119,14 +127,13 @@ export default async function handler(req, res) {
           .toBuffer();
 
         if (pngBuffer.length > 4 * 1024 * 1024) {
-          return res.status(400).json({ error: "Image too large after conversion (>4MB)" });
+          return res.status(400).json({ error: "Image too large after 
+conversion (>4MB)" });
         }
 
         const form = new FormData();
-        form.append("image", pngBuffer, {
-          filename: "upload.png",
-          contentType: "image/png"
-        });
+        form.append("image", pngBuffer, { filename: "upload.png", 
+contentType: "image/png" });
         form.append("prompt", prompt);
         form.append("size", size);
         form.append("n", "1");
@@ -142,35 +149,29 @@ export default async function handler(req, res) {
 
         const data = await r.json();
         const url = data?.data?.[0]?.url || null;
-        const b64 = data?.data?.[0]?.b64_json
-          ? `data:image/png;base64,${data.data[0].b64_json}`
-          : null;
+        const b64 = data?.data?.[0]?.b64_json ? 
+`data:image/png;base64,${data.data[0].b64_json}` : null;
 
         if (!r.ok || (!url && !b64)) {
           return res.status(r.status).json({
-            error: data?.error?.message || "OpenAI did not return an edited image",
+            error: data?.error?.message || "OpenAI did not return an 
+edited image",
             raw: data
           });
         }
 
-        return res.status(200).json({
-          response_image_url: url || b64
-        });
+        return res.status(200).json({ response_image_url: url || b64 });
       } catch (err) {
-        return res.status(500).json({
-          error: "Image edit failed",
-          details: err.message
-        });
+        return res.status(500).json({ error: "Image edit failed", details: 
+err.message });
       }
     }
 
     // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
   } catch (err) {
-    return res.status(500).json({
-      error: "Something went wrong",
-      details: err.message
-    });
+    return res.status(500).json({ error: "Something went wrong", details: 
+err.message });
   }
 }
 
