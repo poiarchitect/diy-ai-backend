@@ -1,4 +1,5 @@
 import FormData from "form-data";
+import { Readable } from "stream";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- Image (generation) ---
+    // --- Image Generation ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -106,9 +107,10 @@ export default async function handler(req, res) {
         }
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Build form-data payload
+        // Build form-data payload with a Readable stream
         const form = new FormData();
-        form.append("image", imgBuffer, { filename: "upload.png", contentType: "image/png" });
+        const stream = Readable.from(imgBuffer);
+        form.append("image", stream, { filename: "upload.png", contentType: "image/png" });
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
@@ -146,4 +148,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
