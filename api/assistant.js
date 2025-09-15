@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // --- Image (URL only, Bubble-ready) ---
+    // --- Image (Bubble-ready: URL if possible, fallback to base64) ---
     if (type === "image") {
       const r = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
@@ -49,21 +49,26 @@ export default async function handler(req, res) {
           model: "gpt-image-1",
           prompt,
           size,
-          n: 1,
-          response_format: "url"
+          n: 1
         })
       });
 
       const data = await r.json();
-      const url = data?.data?.[0]?.url;
+      const url = data?.data?.[0]?.url || null;
+      const b64 = data?.data?.[0]?.b64_json
+        ? `data:image/png;base64,${data.data[0].b64_json}`
+        : null;
 
-      if (!r.ok || !url) {
+      if (!r.ok || (!url && !b64)) {
         return res.status(r.status).json({
-          error: data?.error?.message || "OpenAI did not return an image URL"
+          error: data?.error?.message || "OpenAI did not return an image",
+          raw: data
         });
       }
 
-      return res.status(200).json({ response_image_url: url });
+      return res.status(200).json({
+        response_image_url: url || b64
+      });
     }
 
     // --- Vision (describe an uploaded image) ---
@@ -96,7 +101,6 @@ export default async function handler(req, res) {
 
     // --- Image Edit (reimagine an uploaded image with prompt) ---
     if (type === "image_edit") {
-      // fetch the file from Bubble’s upload URL
       const imgRes = await fetch(image_url);
       if (!imgRes.ok) {
         return res.status(400).json({ error: "Could not fetch uploaded image" });
@@ -109,7 +113,6 @@ export default async function handler(req, res) {
       form.append("prompt", prompt);
       form.append("size", size);
       form.append("n", "1");
-      form.append("response_format", "url");
 
       const r = await fetch("https://api.openai.com/v1/images/edits", {
         method: "POST",
@@ -120,15 +123,21 @@ export default async function handler(req, res) {
       });
 
       const data = await r.json();
-      const url = data?.data?.[0]?.url;
+      const url = data?.data?.[0]?.url || null;
+      const b64 = data?.data?.[0]?.b64_json
+        ? `data:image/png;base64,${data.data[0].b64_json}`
+        : null;
 
-      if (!r.ok || !url) {
+      if (!r.ok || (!url && !b64)) {
         return res.status(r.status).json({
-          error: data?.error?.message || "OpenAI did not return an edited image URL"
+          error: data?.error?.message || "OpenAI did not return an edited image",
+          raw: data
         });
       }
 
-      return res.status(200).json({ response_image_url: url });
+      return res.status(200).json({
+        response_image_url: url || b64
+      });
     }
 
     // --- Fallback ---
