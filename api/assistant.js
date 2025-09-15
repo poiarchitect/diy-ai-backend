@@ -1,5 +1,8 @@
-import FormData from "form-data";
-import { Readable } from "stream";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -13,122 +16,81 @@ export default async function handler(req, res) {
 
     // --- Chat ---
     if (type === "chat") {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }]
-        })
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }]
       });
 
-      const data = await r.json();
       return res.status(200).json({
-        reply: data?.choices?.[0]?.message?.content || null
+        reply: response.choices?.[0]?.message?.content || null
       });
     }
 
     // --- Image Generation ---
     if (type === "image") {
-      const r = await fetch("https://api.openai.com/v1/images/generations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          prompt,
-          size,
-          n: 1
-        })
+      const response = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt,
+        size,
+        n: 1
       });
 
-      const data = await r.json();
-      const first = data?.data?.[0];
-
-      if (!r.ok || !first) {
-        return res.status(r.status || 400).json({
-          error: data?.error?.message || "OpenAI image generation failed"
-        });
+      const first = response.data?.[0];
+      if (!first) {
+        return res.status(400).json({ error: "OpenAI image generation failed", raw: response });
       }
 
       const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
-      if (!url) {
-        return res.status(400).json({ error: "OpenAI did not return usable image content" });
-      }
-
       return res.status(200).json({ response_image_url: url });
     }
 
     // --- Vision ---
     if (type === "vision") {
-      const r = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
             role: "user",
             content: [
               { type: "text", text: question },
               { type: "image_url", image_url: { url: image_url } }
             ]
-          }]
-        })
+          }
+        ]
       });
 
-      const data = await r.json();
       return res.status(200).json({
-        vision_reply: data?.choices?.[0]?.message?.content || null
+        vision_reply: response.choices?.[0]?.message?.content || null
       });
     }
 
     // --- Image Edit ---
     if (type === "image_edit") {
       try {
-        // Fetch the image from URL
+        // Fetch the image into a buffer
         const imgRes = await fetch(image_url);
         if (!imgRes.ok) {
           return res.status(400).json({ error: "Could not fetch image from provided URL" });
         }
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Wrap buffer into a stream so it's treated as a file
-        const stream = Readable.from(imgBuffer);
-
-        const form = new FormData();
-        form.append("image", stream, {
-          filename: "upload.png",
-          contentType: "image/png"
-        });
-        form.append("prompt", prompt || "");
-        form.append("size", size || "1024x1024");
-        form.append("n", "1");
-
-        const r = await fetch("https://api.openai.com/v1/images/edits", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            ...form.getHeaders()
-          },
-          body: form
+        // Send buffer directly to OpenAI SDK
+        const response = await openai.images.edits({
+          model: "gpt-image-1",
+          image: [
+            {
+              name: "upload.png",
+              buffer: imgBuffer
+            }
+          ],
+          prompt: prompt || "",
+          size: size || "1024x1024",
+          n: 1
         });
 
-        const data = await r.json();
-        const first = data?.data?.[0];
-
-        if (!r.ok || !first) {
-          return res.status(r.status || 400).json({
-            error: data?.error?.message || "OpenAI image edit failed",
-            raw: data
-          });
+        const first = response.data?.[0];
+        if (!first) {
+          return res.status(400).json({ error: "OpenAI image edit failed", raw: response });
         }
 
         const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
