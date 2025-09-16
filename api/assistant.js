@@ -33,7 +33,9 @@ export default async function handler(req, res) {
         n: 1
       });
       const first = response.data?.[0];
-      if (!first) return res.status(400).json({ error: "OpenAI image generation failed", raw: response });
+      if (!first) {
+        return res.status(400).json({ error: "OpenAI image generation failed", raw: response });
+      }
       const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
       return res.status(200).json({ response_image_url: url });
     }
@@ -65,21 +67,21 @@ export default async function handler(req, res) {
 
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Convert to PNG, ensure RGBA, resize max 1024x1024, keep under 4MB
+        // Convert to RGBA PNG, resize max 1024x1024, keep under 4MB
         const pngBuffer = await sharp(imgBuffer)
           .resize({ width: 1024, height: 1024, fit: "inside" })
-          .ensureAlpha()              // guarantee RGBA format
-          .png({ quality: 90 })
+          .ensureAlpha() // force alpha channel
+          .png({ force: true, quality: 90 })
           .toBuffer();
 
         if (pngBuffer.length > 4 * 1024 * 1024) {
           return res.status(400).json({ error: "Image too large after conversion (>4MB). Please upload a smaller image." });
         }
 
-        // Build form-data
+        // Build form-data with explicit filename
         const form = new FormData();
         const file = new File([pngBuffer], "upload.png", { type: "image/png" });
-        form.append("image", file);
+        form.append("image", file, "upload.png");
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
@@ -93,7 +95,10 @@ export default async function handler(req, res) {
         const data = await r.json();
         const first = data?.data?.[0];
         if (!r.ok || !first) {
-          return res.status(r.status || 400).json({ error: data?.error?.message || "OpenAI image edit failed", raw: data });
+          return res.status(r.status || 400).json({
+            error: data?.error?.message || "OpenAI image edit failed",
+            raw: data
+          });
         }
 
         const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
