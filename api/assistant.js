@@ -2,6 +2,11 @@ import OpenAI from "openai";
 import sharp from "sharp";
 import FormData from "form-data";
 
+// Force Node.js runtime so sharp + form-data work correctly
+export const config = {
+  runtime: "nodejs"
+};
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -68,12 +73,12 @@ export default async function handler(req, res) {
 
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Force RGBA PNG
+        // Convert to RGBA PNG, resize max 1024x1024, keep under 4MB
         const pngBuffer = await sharp(imgBuffer)
           .resize({ width: 1024, height: 1024, fit: "inside" })
-          .ensureAlpha()
-          .toFormat("png")
-          .toColourspace("rgba")   // force RGBA
+          .ensureAlpha() // add alpha if missing
+          .toColorspace("rgb") // keep channels consistent
+          .png()
           .toBuffer();
 
         if (pngBuffer.length > 4 * 1024 * 1024) {
@@ -92,7 +97,10 @@ export default async function handler(req, res) {
 
         const r = await fetch("https://api.openai.com/v1/images/edits", {
           method: "POST",
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            ...form.getHeaders()
+          },
           body: form
         });
 
