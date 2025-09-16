@@ -65,9 +65,10 @@ export default async function handler(req, res) {
 
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Convert to PNG, resize max 1024x1024, compress under 4MB
+        // Convert to PNG, ensure RGBA, resize max 1024x1024, keep under 4MB
         const pngBuffer = await sharp(imgBuffer)
           .resize({ width: 1024, height: 1024, fit: "inside" })
+          .ensureAlpha()              // guarantee RGBA format
           .png({ quality: 90 })
           .toBuffer();
 
