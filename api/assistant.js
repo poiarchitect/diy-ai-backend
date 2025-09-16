@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import sharp from "sharp";
+import FormData from "form-data";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -78,17 +79,16 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "Image too large after conversion (>4MB). Please upload a smaller image." });
         }
 
-        // Build form-data with explicit filename
+        // Build form-data using Node's form-data package
         const form = new FormData();
-        const file = new File([pngBuffer], "upload.png", { type: "image/png" });
-        form.append("image", file, "upload.png");
+        form.append("image", pngBuffer, { filename: "upload.png", contentType: "image/png" });
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
 
         const r = await fetch("https://api.openai.com/v1/images/edits", {
           method: "POST",
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
           body: form
         });
 
@@ -115,3 +115,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
+
