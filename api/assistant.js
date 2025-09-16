@@ -11,8 +11,17 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-    const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
-    if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
+    const {
+      type,
+      prompt,
+      image_url,
+      question,
+      size = "1024x1024"
+    } = body || {};
+
+    if (!type) {
+      return res.status(400).json({ error: "Missing 'type' in request body" });
+    }
 
     // --- Chat ---
     if (type === "chat") {
@@ -36,12 +45,21 @@ export default async function handler(req, res) {
       });
 
       const first = response.data?.[0];
-      if (!first) {
-        return res.status(400).json({ error: "OpenAI image generation failed", raw: response });
+      const url = first?.url || null;
+      const b64 = first?.b64_json
+        ? `data:image/png;base64,${first.b64_json}`
+        : null;
+
+      if (!url && !b64) {
+        return res.status(400).json({
+          error: "OpenAI did not return an image",
+          raw: response
+        });
       }
 
-      const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
-      return res.status(200).json({ response_image_url: url });
+      return res.status(200).json({
+        response_image_url: url || b64
+      });
     }
 
     // --- Vision ---
@@ -66,8 +84,11 @@ export default async function handler(req, res) {
 
     // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
-
   } catch (err) {
-    return res.status(500).json({ error: "Something went wrong", details: err.message });
+    return res.status(500).json({
+      error: "Something went wrong",
+      details: err.message
+    });
   }
 }
+
