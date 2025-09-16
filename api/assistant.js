@@ -10,39 +10,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("Handler invoked"); // Debug
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const { type, prompt, image_url, question, size = "1024x1024" } = body || {};
-
-    console.log("Request type:", type); // Debug
-
-    if (!type) {
-      return res.status(400).json({ error: "Missing 'type' in request body" });
-    }
+    if (!type) return res.status(400).json({ error: "Missing 'type' in request body" });
 
     // --- Chat ---
     if (type === "chat") {
-      console.log("Running chat with prompt:", prompt); // Debug
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are DIY Assistant. A professional, approachable, safety-conscious mentor for the entire DIY and construction world. Always prioritize safety, never guide 
-electrical/gas/plumbing work, but warn users of risks. Speak like a trusted tradesperson."
+            content:
+              "You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction. Your role is to help users plan, understand, and carry 
+out projects across the full scope of DIY: woodworking, painting, flooring, roofing, landscaping, furniture assembly, renovations, and more. Safety is your highest priority: always highlight hazards 
+like power tools, drilling, dust, chemicals, working at height. When drilling or cutting into walls, always warn about hidden pipes, wiring, and gas lines. Never provide instructions for electrical 
+wiring, gas fitting, or plumbing repairs—recommend licensed professionals instead. Speak with the voice of a trusted tradesperson: knowledgeable, approachable, practical. Stay strictly within DIY, 
+home improvement, and construction. Your goal: make the user feel they have a skilled, reliable DIY partner in their pocket who keeps them safe while guiding them to success."
           },
           { role: "user", content: prompt }
         ]
       });
 
-      const reply = response.choices?.[0]?.message?.content || null;
-      console.log("Chat reply:", reply); // Debug
-      return res.status(200).json({ reply });
+      return res.status(200).json({
+        reply: response.choices?.[0]?.message?.content || null
+      });
     }
 
-    // --- Image Generation ---
+    // --- Image ---
     if (type === "image") {
-      console.log("Running image generation with prompt:", prompt); // Debug
       const response = await openai.images.generate({
         model: "gpt-image-1",
         prompt,
@@ -55,23 +51,22 @@ electrical/gas/plumbing work, but warn users of risks. Speak like a trusted trad
       const b64 = first?.b64_json ? `data:image/png;base64,${first.b64_json}` : null;
 
       if (!url && !b64) {
-        console.error("Image gen failed:", response); // Debug
         return res.status(400).json({ error: "OpenAI did not return an image", raw: response });
       }
 
-      console.log("Image URL:", url || "[base64 returned]"); // Debug
       return res.status(200).json({ response_image_url: url || b64 });
     }
 
     // --- Vision ---
     if (type === "vision") {
-      console.log("Running vision with question:", question, "and image_url:", image_url); // Debug
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are DIY Assistant. Always prioritize safety. Never provide electrical, gas, or plumbing instructions. Warn users of risks while guiding safe DIY tasks."
+            content:
+              "You are DIY Assistant. Always prioritize safety. Never provide instructions for gas, electrical, or plumbing work; only warn and suggest licensed professionals. For all other DIY, 
+highlight hazards and provide safe, practical guidance."
           },
           {
             role: "user",
@@ -83,15 +78,13 @@ electrical/gas/plumbing work, but warn users of risks. Speak like a trusted trad
         ]
       });
 
-      const vision_reply = response.choices?.[0]?.message?.content || null;
-      console.log("Vision reply:", vision_reply); // Debug
-      return res.status(200).json({ vision_reply });
+      return res.status(200).json({
+        vision_reply: response.choices?.[0]?.message?.content || null
+      });
     }
 
-    // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
   } catch (err) {
-    console.error("Handler error:", err); // Debug
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
