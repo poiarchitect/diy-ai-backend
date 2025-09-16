@@ -1,4 +1,4 @@
-mport OpenAI from "openai";
+import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -20,7 +20,10 @@ export default async function handler(req, res) {
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }]
       });
-      return res.status(200).json({ reply: response.choices?.[0]?.message?.content || null });
+
+      return res.status(200).json({
+        reply: response.choices?.[0]?.message?.content || null
+      });
     }
 
     // --- Image Generation ---
@@ -31,10 +34,12 @@ export default async function handler(req, res) {
         size,
         n: 1
       });
+
       const first = response.data?.[0];
       if (!first) {
         return res.status(400).json({ error: "OpenAI image generation failed", raw: response });
       }
+
       const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
       return res.status(200).json({ response_image_url: url });
     }
@@ -53,7 +58,10 @@ export default async function handler(req, res) {
           }
         ]
       });
-      return res.status(200).json({ vision_reply: response.choices?.[0]?.message?.content || null });
+
+      return res.status(200).json({
+        vision_reply: response.choices?.[0]?.message?.content || null
+      });
     }
 
     // --- Fallback ---
