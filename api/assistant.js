@@ -1,19 +1,8 @@
-import OpenAI from "openai";
-import sharp from "sharp";
-import FormData from "form-data";
-import { Readable } from "stream";
+mport OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
-
-// Helper: convert Buffer -> Readable stream
-function bufferToStream(buffer) {
-  const stream = new Readable();
-  stream.push(buffer);
-  stream.push(null);
-  return stream;
-}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -67,60 +56,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ vision_reply: response.choices?.[0]?.message?.content || null });
     }
 
-    // --- Image Edit ---
-    if (type === "image_edit") {
-      try {
-        const imgRes = await fetch(image_url);
-        if (!imgRes.ok) {
-          return res.status(400).json({ error: "Could not fetch image from provided URL" });
-        }
-
-        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
-
-        // Convert to sRGB RGBA PNG, resize max 1024x1024, keep under 4MB
-        const pngBuffer = await sharp(imgBuffer)
-          .resize({ width: 1024, height: 1024, fit: "inside" })
-          .ensureAlpha() // add alpha if missing
-          .toColorspace("srgb")
-          .png({ quality: 90 })
-          .toBuffer();
-
-        if (pngBuffer.length > 4 * 1024 * 1024) {
-          return res.status(400).json({ error: "Image too large after conversion (>4MB). Please upload a smaller image." });
-        }
-
-        // Build form-data with stream
-        const form = new FormData();
-        form.append("image", bufferToStream(pngBuffer), {
-          filename: "upload.png",
-          contentType: "image/png"
-        });
-        form.append("prompt", prompt || "");
-        form.append("size", size || "1024x1024");
-        form.append("n", "1");
-
-        const r = await fetch("https://api.openai.com/v1/images/edits", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
-          body: form
-        });
-
-        const data = await r.json();
-        const first = data?.data?.[0];
-        if (!r.ok || !first) {
-          return res.status(r.status || 400).json({
-            error: data?.error?.message || "OpenAI image edit failed",
-            raw: data
-          });
-        }
-
-        const url = first.url || (first.b64_json ? `data:image/png;base64,${first.b64_json}` : null);
-        return res.status(200).json({ response_image_url: url });
-      } catch (err) {
-        return res.status(500).json({ error: "Image edit failed", details: err.message });
-      }
-    }
-
     // --- Fallback ---
     return res.status(400).json({ error: `Unknown type: ${type}` });
 
@@ -128,4 +63,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
