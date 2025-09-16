@@ -68,20 +68,24 @@ export default async function handler(req, res) {
 
         const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
-        // Convert to RGBA PNG, resize max 1024x1024, keep under 4MB
+        // Force RGBA PNG
         const pngBuffer = await sharp(imgBuffer)
           .resize({ width: 1024, height: 1024, fit: "inside" })
-          .ensureAlpha() // force alpha channel
-          .png({ force: true, quality: 90 })
+          .ensureAlpha()
+          .toFormat("png")
+          .toColourspace("rgba")   // force RGBA
           .toBuffer();
 
         if (pngBuffer.length > 4 * 1024 * 1024) {
           return res.status(400).json({ error: "Image too large after conversion (>4MB). Please upload a smaller image." });
         }
 
-        // Build form-data using Node's form-data package
+        // Build form-data with buffer
         const form = new FormData();
-        form.append("image", pngBuffer, { filename: "upload.png", contentType: "image/png" });
+        form.append("image", pngBuffer, {
+          filename: "upload.png",
+          contentType: "image/png"
+        });
         form.append("prompt", prompt || "");
         form.append("size", size || "1024x1024");
         form.append("n", "1");
@@ -115,4 +119,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
