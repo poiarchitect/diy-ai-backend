@@ -18,7 +18,16 @@ export default async function handler(req, res) {
     if (type === "chat") {
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }]
+        messages: [
+          {
+            role: "system",
+            content: "You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction. Your highest priority is safety. Always highlight hazards like power tools, 
+cutting, drilling, dust, chemicals, working at height. If drilling or cutting into walls, warn about hidden pipes, wiring, and gas lines. Never provide instructions for electrical wiring, gas fitting, or plumbing repairs. Instead, 
+recommend licensed professionals. Stay strictly within DIY, home improvement, and construction. Your goal is to make the user feel they have a skilled, reliable DIY partner in their pocket who keeps them safe while guiding them to 
+success."
+          },
+          { role: "user", content: prompt }
+        ]
       });
 
       return res.status(200).json({
@@ -54,6 +63,11 @@ export default async function handler(req, res) {
         model: "gpt-4o-mini",
         messages: [
           {
+            role: "system",
+            content: "You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction. Follow the same safety-first rules as in chat mode: never provide instructions for 
+gas, electrical, or plumbing work. Only warn about them and suggest licensed professionals. For all other DIY, highlight hazards and give safe, practical advice."
+          },
+          {
             role: "user",
             content: [
               { type: "text", text: question },
@@ -74,3 +88,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
+
