@@ -31,7 +31,7 @@ success."
       });
 
       return res.status(200).json({
-        reply: response.choices?.[0]?.message?.content || null
+        reply: response.choices[0].message.content
       });
     }
 
@@ -44,9 +44,9 @@ success."
         n: 1
       });
 
-      const first = response.data?.[0];
-      const url = first?.url || null;
-      const b64 = first?.b64_json ? `data:image/png;base64,${first.b64_json}` : null;
+      const first = response.data[0];
+      const url = first.url || null;
+      const b64 = first.b64_json ? `data:image/png;base64,${first.b64_json}` : null;
 
       if (!url && !b64) {
         return res.status(400).json({ error: "OpenAI did not return an image" });
@@ -78,7 +78,7 @@ gas, electrical, or plumbing work. Only warn about them and suggest licensed pro
       });
 
       return res.status(200).json({
-        vision_reply: response.choices?.[0]?.message?.content || null
+        vision_reply: response.choices[0].message.content
       });
     }
 
@@ -88,4 +88,3 @@ gas, electrical, or plumbing work. Only warn about them and suggest licensed pro
     return res.status(500).json({ error: "Something went wrong", details: err.message });
   }
 }
-
