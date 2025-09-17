@@ -4,6 +4,17 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// --- Helper to clean model replies ---
+function cleanReply(text) {
+  if (!text) return null;
+  return text
+    .replace(/\\n/g, "\n")   // turn \n into actual newlines
+    .replace(/\s+\n/g, "\n") // trim spaces before newlines
+    .replace(/[*•#>-]+/g, "") // strip markdown bullets, hashes, dashes
+    .replace(/\n{3,}/g, "\n\n") // collapse extra blank lines
+    .trim();
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -35,9 +46,8 @@ Your goal is to make the user feel they have a skilled, reliable DIY partner in 
         ]
       });
 
-      return res.status(200).json({
-        reply: response.choices?.[0]?.message?.content || null
-      });
+      const reply = cleanReply(response.choices?.[0]?.message?.content);
+      return res.status(200).json({ reply });
     }
 
     // --- Image Generation ---
@@ -57,9 +67,7 @@ Your goal is to make the user feel they have a skilled, reliable DIY partner in 
         return res.status(400).json({ error: "OpenAI did not return an image" });
       }
 
-      return res.status(200).json({
-        response_image_url: url || b64
-      });
+      return res.status(200).json({ response_image_url: url || b64 });
     }
 
     // --- Vision ---
@@ -86,9 +94,8 @@ Follow the same safety-first rules as in chat mode:
         ]
       });
 
-      return res.status(200).json({
-        vision_reply: response.choices?.[0]?.message?.content || null
-      });
+      const vision_reply = cleanReply(response.choices?.[0]?.message?.content);
+      return res.status(200).json({ vision_reply });
     }
 
     return res.status(400).json({ error: `Unknown type: ${type}` });
