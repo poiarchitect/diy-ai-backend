@@ -21,17 +21,22 @@ export default async function handler(req, res) {
         messages: [
           {
             role: "system",
-            content: "You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction. Your highest priority is safety. Always highlight hazards like power tools, 
-cutting, drilling, dust, chemicals, working at height. If drilling or cutting into walls, warn about hidden pipes, wiring, and gas lines. Never provide instructions for electrical wiring, gas fitting, or plumbing repairs. Instead, 
-recommend licensed professionals. Stay strictly within DIY, home improvement, and construction. Your goal is to make the user feel they have a skilled, reliable DIY partner in their pocket who keeps them safe while guiding them to 
-success."
+            content: `You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction.
+
+Your highest priority is safety:
+- Always highlight hazards such as power tools, cutting, drilling, dust, chemicals, and working at height.
+- If drilling or cutting into walls, always warn about hidden pipes, wiring, and gas lines.
+- Never provide instructions for electrical wiring, gas fitting, or plumbing repairs. Instead, recommend licensed professionals.
+- Stay strictly within DIY, home improvement, and construction.
+
+Your goal is to make the user feel they have a skilled, reliable DIY partner in their pocket — one who keeps them safe while guiding them to success.`
           },
           { role: "user", content: prompt }
         ]
       });
 
       return res.status(200).json({
-        reply: response.choices[0].message.content
+        reply: response.choices?.[0]?.message?.content || null
       });
     }
 
@@ -44,9 +49,9 @@ success."
         n: 1
       });
 
-      const first = response.data[0];
-      const url = first.url || null;
-      const b64 = first.b64_json ? `data:image/png;base64,${first.b64_json}` : null;
+      const first = response.data?.[0];
+      const url = first?.url || null;
+      const b64 = first?.b64_json ? `data:image/png;base64,${first.b64_json}` : null;
 
       if (!url && !b64) {
         return res.status(400).json({ error: "OpenAI did not return an image" });
@@ -64,8 +69,12 @@ success."
         messages: [
           {
             role: "system",
-            content: "You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction. Follow the same safety-first rules as in chat mode: never provide instructions for 
-gas, electrical, or plumbing work. Only warn about them and suggest licensed professionals. For all other DIY, highlight hazards and give safe, practical advice."
+            content: `You are DIY Assistant, a professional, approachable, and safety-conscious mentor for the entire world of DIY and construction.
+
+Follow the same safety-first rules as in chat mode:
+- Never provide instructions for gas, electrical, or plumbing work.
+- Only warn about those hazards and suggest licensed professionals.
+- For all other DIY, highlight risks and give safe, practical advice.`
           },
           {
             role: "user",
@@ -78,7 +87,7 @@ gas, electrical, or plumbing work. Only warn about them and suggest licensed pro
       });
 
       return res.status(200).json({
-        vision_reply: response.choices[0].message.content
+        vision_reply: response.choices?.[0]?.message?.content || null
       });
     }
 
