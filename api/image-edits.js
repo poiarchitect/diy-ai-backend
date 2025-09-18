@@ -1,5 +1,5 @@
 import formidable from "formidable";
-import fs from "fs";
+import fs from "fs/promises";
 import OpenAI from "openai";
 
 export const config = {
@@ -12,7 +12,6 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// helper: parse multipart form-data
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -37,22 +36,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // read uploaded file into buffer
-    const imageBuffer = fs.readFileSync(files.file.filepath);
+    // Instead of filepath, read file into a buffer
+    const fileData = await fs.readFile(files.file[0].filepath);
 
-    // call OpenAI edits API
     const response = await client.images.edits({
       model: "gpt-image-1",
-      image: [imageBuffer],
       prompt,
+      image: [
+        {
+          name: "file",
+          buffer: fileData,
+        },
+      ],
       size,
     });
 
-    return res.status(200).json({ url: response.data[0].url });
+    res.status(200).json({ url: response.data[0].url });
   } catch (error) {
     console.error("Image edit error:", error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 }
-
 
