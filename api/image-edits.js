@@ -41,8 +41,8 @@ export default async function handler(req, res) {
     // Read uploaded file into buffer
     const imageBuffer = fs.readFileSync(files.file.filepath);
 
-    // Call OpenAI Image Edits
-    const response = await client.images.edit({
+    // Call OpenAI Image Edits (note: `.edits` plural!)
+    const response = await client.images.edits({
       model: "gpt-image-1",
       image: imageBuffer,
       prompt,
