@@ -12,7 +12,6 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Promisify formidable
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -33,17 +32,17 @@ export default async function handler(req, res) {
     const prompt = fields.prompt?.toString() || "Edit this image";
     const size = fields.size?.toString() || "1024x1024";
 
-    if (!files.file) {
+    const uploadedFile = files.file?.[0];
+    if (!uploadedFile) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Read file into buffer (works on Vercel)
-    const fileBuffer = await fs.readFile(files.file.filepath);
+    const imageBuffer = await fs.readFile(uploadedFile.filepath);
 
     const response = await client.images.edits({
       model: "gpt-image-1",
-      image: fileBuffer,
       prompt,
+      image: imageBuffer,
       size,
     });
 
