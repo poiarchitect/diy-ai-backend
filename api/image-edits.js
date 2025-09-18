@@ -1,7 +1,14 @@
+import formidable from "formidable";
+import fs from "fs";
 import OpenAI from "openai";
-import sharp from "sharp";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const config = {
+  api: {
+    bodyParser: false, // disable default body parser, we’re handling form-data
+  },
+};
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -9,48 +16,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt, image_url, size = "1024x1024" } = req.body;
+    // Parse multipart form-data
+    const form = new formidable.IncomingForm();
+    form.parse(req, async (err, fields, files) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Error parsing form data" });
+      }
 
-    if (!prompt || !image_url) {
-      return res.status(400).json({ error: "Missing prompt or image_url" });
-    }
+      const prompt = fields.prompt;
+      const size = fields.size || "1024x1024";
 
-    // Fetch the image from URL
-    const imgRes = await fetch(image_url);
-    if (!imgRes.ok) {
-      return res.status(400).json({ error: "Could not fetch image" });
-    }
+      if (!files.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
 
-    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+      const imageStream = fs.createReadStream(files.file.filepath);
 
-    // Convert to PNG and resize to OpenAI spec
-    const pngBuffer = await sharp(imgBuffer)
-      .resize({ width: 1024, height: 1024, fit: "inside" })
-      .png()
-      .toBuffer();
+      const response = await client.images.edits({
+        model: "gpt-image-1",
+        image: imageStream,
+        prompt,
+        size,
+      });
 
-    if (pngBuffer.length > 4 * 1024 * 1024) {
-      return res.status(400).json({ error: "Image too large after conversion (>4MB)" });
-    }
-
-    // Call OpenAI Image Edit endpoint
-    const response = await openai.images.edits({
-      model: "gpt-image-1",
-      prompt,
-      image: [
-        {
-          name: "image.png",
-          buffer: pngBuffer,
-        },
-      ],
-      size,
+      const imageBase64 = response.data[0].b64_json;
+      res.status(200).json({ image: imageBase64 });
     });
-
-    const editedImage = response.data[0].b64_json;
-
-    res.status(200).json({ image: editedImage });
   } catch (error) {
-    console.error("Error editing image:", error);
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 }
