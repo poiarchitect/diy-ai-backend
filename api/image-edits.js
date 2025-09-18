@@ -4,7 +4,7 @@ import OpenAI from "openai";
 
 export const config = {
   api: {
-    bodyParser: false, // formidable handles file parsing
+    bodyParser: false, // required for formidable
   },
 };
 
@@ -12,7 +12,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Promisify formidable parsing
+// Parse form into promise
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -33,12 +33,18 @@ export default async function handler(req, res) {
     const prompt = fields.prompt?.toString() || "Edit this image";
     const size = fields.size?.toString() || "1024x1024";
 
-    if (!files.file) {
+    const uploaded = files.file;
+    if (!uploaded) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Always use .filepath for formidable v3
-    const imageStream = fs.createReadStream(files.file.filepath);
+    // Handle formidable v3 file property
+    const filePath = uploaded[0]?.filepath || uploaded.filepath || uploaded.path;
+    if (!filePath) {
+      return res.status(400).json({ error: "No valid filepath found" });
+    }
+
+    const imageStream = fs.createReadStream(filePath);
 
     const response = await client.images.edits({
       model: "gpt-image-1",
@@ -53,4 +59,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-
