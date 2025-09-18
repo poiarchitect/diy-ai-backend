@@ -1,5 +1,5 @@
 import formidable from "formidable";
-import fs from "fs/promises"; // use promises API
+import fs from "fs/promises";
 import OpenAI from "openai";
 
 export const config = {
@@ -37,14 +37,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Read uploaded file into memory as Buffer
-    const filePath = files.file.filepath;
-    const imageBuffer = await fs.readFile(filePath);
+    // Read file into buffer (works on Vercel)
+    const fileBuffer = await fs.readFile(files.file.filepath);
 
     const response = await client.images.edits({
       model: "gpt-image-1",
+      image: fileBuffer,
       prompt,
-      image: imageBuffer, // pass buffer instead of stream
       size,
     });
 
