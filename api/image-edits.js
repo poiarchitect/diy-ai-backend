@@ -4,11 +4,23 @@ import OpenAI from "openai";
 
 export const config = {
   api: {
-    bodyParser: false, // disable default body parser, we’re handling form-data
+    bodyParser: false, // required for formidable
   },
 };
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Helper to promisify formidable.parse
+const parseForm = (req) =>
+  new Promise((resolve, reject) => {
+    const form = formidable({ multiples: false });
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      else resolve({ fields, files });
+    });
+  });
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -16,36 +28,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Parse multipart form-data
-    const form = new formidable.IncomingForm();
-    form.parse(req, async (err, fields, files) => {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: "Error parsing form data" });
-      }
+    const { fields, files } = await parseForm(req);
 
-      const prompt = fields.prompt;
-      const size = fields.size || "1024x1024";
+    const prompt = fields.prompt?.toString() || "Edit this image";
+    const size = fields.size?.toString() || "1024x1024";
 
-      if (!files.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
+    if (!files.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
-      const imageStream = fs.createReadStream(files.file.filepath);
+    const imageStream = fs.createReadStream(files.file.filepath);
 
-      const response = await client.images.edits({
-        model: "gpt-image-1",
-        image: imageStream,
-        prompt,
-        size,
-      });
-
-      const imageBase64 = response.data[0].b64_json;
-      res.status(200).json({ image: imageBase64 });
+    const response = await client.images.edits({
+      model: "gpt-image-1",
+      prompt,
+      image: imageStream,
+      size,
     });
+
+    // Return the hosted image URL from OpenAI
+    res.status(200).json({ url: response.data[0].url });
   } catch (error) {
-    console.error(error);
+    console.error("Image edit error:", error);
     res.status(500).json({ error: error.message });
   }
 }
+
 
