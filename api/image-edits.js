@@ -12,6 +12,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// helper: parse multipart form-data
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -32,33 +33,26 @@ export default async function handler(req, res) {
     const prompt = fields.prompt?.toString() || "Edit this image";
     const size = fields.size?.toString() || "1024x1024";
 
-    // Check file exists
-    const uploaded = files.file;
-    if (!uploaded) {
+    if (!files.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // In formidable v3, path can be `filepath` or just `file.path`
-    const filepath = uploaded.filepath || uploaded.path;
-    if (!filepath) {
-      return res.status(400).json({ error: "Upload failed: no filepath found" });
-    }
+    // read uploaded file into buffer
+    const imageBuffer = fs.readFileSync(files.file.filepath);
 
-    // Read file into buffer
-    const imageBuffer = fs.readFileSync(filepath);
-
-    // Send to OpenAI
+    // call OpenAI edits API
     const response = await client.images.edits({
       model: "gpt-image-1",
+      image: [imageBuffer],
       prompt,
-      image: imageBuffer,
       size,
     });
 
-    res.status(200).json({ url: response.data[0].url });
+    return res.status(200).json({ url: response.data[0].url });
   } catch (error) {
     console.error("Image edit error:", error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 }
+
 
