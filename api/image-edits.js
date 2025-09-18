@@ -1,5 +1,5 @@
 import formidable from "formidable";
-import fs from "fs";
+import fs from "fs/promises"; // use promises API
 import OpenAI from "openai";
 
 export const config = {
@@ -12,7 +12,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Helper to promisify formidable.parse
+// Promisify formidable
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -37,21 +37,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const imageStream = fs.createReadStream(files.file.filepath);
+    // Read uploaded file into memory as Buffer
+    const filePath = files.file.filepath;
+    const imageBuffer = await fs.readFile(filePath);
 
     const response = await client.images.edits({
       model: "gpt-image-1",
       prompt,
-      image: imageStream,
+      image: imageBuffer, // pass buffer instead of stream
       size,
     });
 
-    // Return the hosted image URL from OpenAI
     res.status(200).json({ url: response.data[0].url });
   } catch (error) {
     console.error("Image edit error:", error);
     res.status(500).json({ error: error.message });
   }
 }
-
 
