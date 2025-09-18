@@ -1,17 +1,17 @@
 import formidable from "formidable";
 import fs from "fs";
-import fetch from "node-fetch";
 import OpenAI from "openai";
 
 export const config = {
   api: {
-    bodyParser: false, // disable default body parser for file uploads
+    bodyParser: false, // required for formidable
   },
 };
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-// Helper: parse multipart form
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -27,47 +27,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    let prompt, size, imageBuffer;
+    const { fields, files } = await parseForm(req);
 
-    if (req.headers["content-type"]?.includes("multipart/form-data")) {
-      // Case 1: file upload
-      const { fields, files } = await parseForm(req);
-      prompt = fields.prompt?.toString() || "Edit this image";
-      size = fields.size?.toString() || "1024x1024";
+    const prompt = fields.prompt?.toString() || "Edit this image";
+    const size = fields.size?.toString() || "1024x1024";
 
-      if (!files.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      imageBuffer = fs.readFileSync(files.file.filepath);
-    } else {
-      // Case 2: JSON with image_url
-      const body = await new Promise((resolve, reject) => {
-        let data = "";
-        req.on("data", (chunk) => (data += chunk));
-        req.on("end", () => resolve(JSON.parse(data || "{}")));
-        req.on("error", reject);
-      });
-
-      prompt = body.prompt || "Edit this image";
-      size = body.size || "1024x1024";
-
-      if (!body.image_url) {
-        return res.status(400).json({ error: "No image_url provided" });
-      }
-
-      const response = await fetch(body.image_url);
-      if (!response.ok) {
-        return res.status(400).json({ error: "Failed to fetch remote image" });
-      }
-      imageBuffer = Buffer.from(await response.arrayBuffer());
+    // Check file exists
+    const uploaded = files.file;
+    if (!uploaded) {
+      return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Call OpenAI edits
+    // In formidable v3, path can be `filepath` or just `file.path`
+    const filepath = uploaded.filepath || uploaded.path;
+    if (!filepath) {
+      return res.status(400).json({ error: "Upload failed: no filepath found" });
+    }
+
+    // Read file into buffer
+    const imageBuffer = fs.readFileSync(filepath);
+
+    // Send to OpenAI
     const response = await client.images.edits({
       model: "gpt-image-1",
       prompt,
-      image: [imageBuffer],
+      image: imageBuffer,
       size,
     });
 
@@ -77,3 +61,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
