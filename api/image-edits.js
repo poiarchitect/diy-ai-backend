@@ -4,7 +4,7 @@ import OpenAI from "openai";
 
 export const config = {
   api: {
-    bodyParser: false, // required for formidable
+    bodyParser: false, // formidable handles file parsing
   },
 };
 
@@ -12,7 +12,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Helper: wrap formidable into a promise
+// Promisify formidable parsing
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
@@ -28,7 +28,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Parse incoming form data (prompt + file)
     const { fields, files } = await parseForm(req);
 
     const prompt = fields.prompt?.toString() || "Edit this image";
@@ -38,18 +37,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Read uploaded file into buffer
-    const imageBuffer = fs.readFileSync(files.file.filepath);
+    // Always use .filepath for formidable v3
+    const imageStream = fs.createReadStream(files.file.filepath);
 
-    // Call OpenAI Image Edits (note: `.edits` plural!)
     const response = await client.images.edits({
       model: "gpt-image-1",
-      image: imageBuffer,
+      image: imageStream,
       prompt,
       size,
     });
 
-    // Return URL of edited image
     res.status(200).json({ url: response.data[0].url });
   } catch (error) {
     console.error("Image edit error:", error);
