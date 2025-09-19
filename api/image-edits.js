@@ -47,10 +47,9 @@ export default async function handler(req, res) {
       prompt,
       image: [filePart],
       size,
-      response_format: "url"
     });
 
-    // Return only the URL to keep things clean
+    // Only return the URL to avoid giant blobs
     res.status(200).json({ url: response.data[0].url });
   } catch (error) {
     console.error("Image edit error:", error);
