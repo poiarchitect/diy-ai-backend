@@ -2,13 +2,9 @@ import formidable from "formidable";
 import fs from "fs";
 import OpenAI, { toFile } from "openai";
 
-export const config = {
-  api: { bodyParser: false },
-};
+export const config = { api: { bodyParser: false } };
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
@@ -49,11 +45,11 @@ export default async function handler(req, res) {
     const response = await client.images.edit({
       model: "gpt-image-1",
       prompt,
-      image: filePart,
+      image: [filePart],
       size,
     });
 
-    res.status(200).json({ url: response.data[0].url });
+    res.status(200).json(response);
   } catch (error) {
     console.error("Image edit error:", error);
     res.status(500).json({ error: error.message });
