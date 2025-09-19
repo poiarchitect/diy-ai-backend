@@ -49,8 +49,8 @@ export default async function handler(req, res) {
       size,
     });
 
-    // Only return the URL to avoid giant blobs
-    res.status(200).json({ url: response.data[0].url });
+    // Always return full response so we can debug
+    res.status(200).json(response);
   } catch (error) {
     console.error("Image edit error:", error);
     res.status(500).json({ error: error.message });
