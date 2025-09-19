@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       { type: mimetype }
     );
 
-    const response = await client.images.edits({
+    const response = await client.images.edit({
       model: "gpt-image-1",
       prompt,
       image: filePart,
