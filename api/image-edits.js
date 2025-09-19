@@ -49,8 +49,15 @@ export default async function handler(req, res) {
       size,
     });
 
-    // ✅ Return only the clean URL
-    res.status(200).json({ url: response.data[0].url });
+    const first = response.data?.[0];
+    const url = first?.url || null;
+    const b64 = first?.b64_json ? `data:image/png;base64,${first.b64_json}` : null;
+
+    if (!url && !b64) {
+      return res.status(400).json({ error: "OpenAI did not return an image" });
+    }
+
+    return res.status(200).json({ response_image_url: url || b64 });
   } catch (error) {
     console.error("Image edit error:", error);
     res.status(500).json({ error: error.message });
