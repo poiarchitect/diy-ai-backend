@@ -6,46 +6,50 @@ export const config = {
   api: { bodyParser: false },
 };
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const parseForm = (req) =>
   new Promise((resolve, reject) => {
     const form = formidable({ multiples: false });
-    form.parse(req, (err, fields, files) => {
-      if (err) reject(err);
-      else resolve({ fields, files });
-    });
+    form.parse(req, (err, fields, files) =>
+      err ? reject(err) : resolve({ fields, files })
+    );
   });
 
 export default async function handler(req, res) {
-  if (req.method !== "POST")
+  if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
     const { fields, files } = await parseForm(req);
-
-    console.log("FIELDS:", fields);
-    console.log("FILES:", files);
 
     const prompt = fields.prompt?.toString() || "Edit this image";
     const size = fields.size?.toString() || "1024x1024";
 
     const uploaded = Array.isArray(files.file) ? files.file[0] : files.file;
-
     if (!uploaded?.filepath) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
+    const filename = uploaded.originalFilename || "upload.png";
+    const mimetype =
+      uploaded.mimetype && uploaded.mimetype !== "application/octet-stream"
+        ? uploaded.mimetype
+        : "image/png";
+
     const filePart = await toFile(
       fs.createReadStream(uploaded.filepath),
-      uploaded.originalFilename || "upload.png",
-      { type: uploaded.mimetype || "image/png" }
+      filename,
+      { type: mimetype }
     );
 
-    const response = await client.images.edit({
+    const response = await client.images.edits({
       model: "gpt-image-1",
-      image: filePart,
       prompt,
+      image: filePart,
       size,
     });
 
